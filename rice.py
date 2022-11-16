@@ -4,8 +4,6 @@
 # For full license text, see the LICENSE file in the repo root
 # or https://opensource.org/licenses/BSD-3-Clause
 
-#this ones gets mit levels to 8 after first step but wont get first step mitigating
-
 
 """
 Regional Integrated model of Climate and the Economy (RICE)
@@ -17,8 +15,6 @@ import wandb
 from datetime import datetime
 import re
 from random import randint
-
-
 import numpy as np
 from gym.spaces import MultiDiscrete
 
@@ -95,10 +91,6 @@ class Rice:
             self.dice_constant, self.rice_constant
         )
 
-        self.logging = True
-
-        
-
         # TODO: rename constans[0] to dice_constants?
         self.start_year = self.all_constants[0]["xt_0"]
         self.end_year = (
@@ -151,6 +143,9 @@ class Rice:
             + self.tariff_actions_nvec
         )
 
+        #enable logging
+        self.logging = True
+
         # Negotiation-related initializations
         if self.negotiation_on:
             self.stage = 0
@@ -162,7 +157,7 @@ class Rice:
             # Each region proposes to each other region
             # self mitigation and their mitigation values
             self.proposal_actions_nvec = (
-                [self.num_discrete_action_levels] 
+                [self.num_discrete_action_levels] * 2 * self.num_regions
             )
 
             # Each region evaluates a proposal from every other region,
@@ -193,7 +188,7 @@ class Rice:
         self.timestep = 0
         self.activity_timestep = 0
         self.current_year = self.start_year
-        
+
         constants = self.all_constants
 
         self.set_global_state(
@@ -320,7 +315,6 @@ class Rice:
             "scaled_imports",
             "desired_imports",
             "tariffed_imports",
-            "minimum_tariff_rate_all_regions"
         ]:
             self.set_global_state(
                 key=key,
@@ -341,26 +335,16 @@ class Rice:
             value=np.zeros(self.num_regions),
             timestep=self.timestep,
         )
-
         for key in [
-            "proposal_decisions"
+            "promised_mitigation_rate",
+            "requested_mitigation_rate",
+            "proposal_decisions",
         ]:
             self.set_global_state(
                 key=key,
                 value=np.zeros((self.num_regions, self.num_regions)),
                 timestep=self.timestep,
             )
-        
-        for key in [            
-            "proposed_mitigation_rate",
-            "proposed_tariff_rate"
-            ]:
-            self.set_global_state(
-                key = key,
-                value = np.zeros(self.num_regions),
-                timestep = self.timestep,
-            )
-
 
         return self.generate_observation()
 
@@ -372,6 +356,7 @@ class Rice:
         """
         # Increment timestep
         self.timestep += 1
+
         # Carry over the previous global states to the current timestep
         for key in self.global_state:
             if key != "reward_all_regions":
@@ -383,15 +368,13 @@ class Rice:
             "timestep", self.timestep, self.timestep, dtype=self.int_dtype
         )
 
+        #if simulation ended create log
         if self.timestep == self.episode_length-1:
             self.log_metrics()
-
-        
 
         if self.negotiation_on:
             # Note: The '+1` below is for the climate_and_economy_simulation_step
             self.stage = self.timestep % (self.num_negotiation_stages + 1)
-            
             self.set_global_state(
                 "stage", self.stage, self.timestep, dtype=self.int_dtype
             )
@@ -522,8 +505,6 @@ class Rice:
             "max_export_limit_all_regions",
             "current_balance_all_regions",
             "tariffs",
-            "proposed_mitigation_rate",
-            "proposed_tariff_rate",
         ]
 
         # Private features that are private to each region.
@@ -550,11 +531,12 @@ class Rice:
 
             private_features += [
                 "minimum_mitigation_rate_all_regions",
-                "minimum_tariff_rate_all_regions"
             ]
 
             bilateral_features += [
-                "proposal_decisions"
+                "promised_mitigation_rate",
+                "requested_mitigation_rate",
+                "proposal_decisions",
             ]
 
         shared_features = np.array([])
@@ -624,26 +606,15 @@ class Rice:
         Generate action masks.
         """
         mask_dict = {region_id: None for region_id in range(self.num_regions)}
-        #get mitigation rates for all  countries
-        mitigation_rates = [self.global_state["minimum_mitigation_rate_all_regions"]["value"][
-            self.timestep, idx
-        ] * self.num_discrete_action_levels for idx in range(self.num_regions)]
-
         for region_id in range(self.num_regions):
             mask = self.default_agent_action_mask.copy()
             if self.negotiation_on:
-
-                #mitigation rate
                 minimum_mitigation_rate = int(round(
                     self.global_state["minimum_mitigation_rate_all_regions"]["value"][
                         self.timestep, region_id
                     ]
                     * self.num_discrete_action_levels
                 ))
-
-                minimum_mitigation_rate = 9
-                    
-                
                 mitigation_mask = np.array(
                     [0 for _ in range(minimum_mitigation_rate)]
                     + [
@@ -653,63 +624,9 @@ class Rice:
                         )
                     ]
                 )
-                mask_start_mitigation = sum(self.savings_action_nvec)
-                mask_end_mitigation = mask_start_mitigation + sum(self.mitigation_rate_action_nvec)
-                mask[mask_start_mitigation:mask_end_mitigation] = mitigation_mask
-
-
-                #tariff masks
-                tariff_masks = []
-                for other_region_id in range(self.num_regions):
-
-                    
-
-                    # if other region is self or not in CC
-                    if other_region_id == region_id or sum(self.global_state["proposal_decisions"]["value"][self.timestep, region_id, :]) < 1:
-                        
-                        #make no change to tariff policy
-                        regional_tariff_mask = np.array([1 for _ in range(self.num_discrete_action_levels)])
-
-        
-                    #if other region mitigation < yours punish
-                    elif mitigation_rates[other_region_id] < mitigation_rates[region_id]:
-                        region_tariff_rate = int(round(self.num_discrete_action_levels - mitigation_rates[other_region_id]))
-
-                        regional_tariff_mask = np.array(
-                            [0 for _ in range(region_tariff_rate)]
-                            + [
-                                1
-                                for _ in range(
-                                    self.num_discrete_action_levels - region_tariff_rate
-                                )
-                            ]
-                        )
-
-                    #if other region >= yours reward
-                    elif mitigation_rates[other_region_id] >= mitigation_rates[region_id]:
-                        region_tariff_rate = int(round(self.num_discrete_action_levels - mitigation_rates[other_region_id]))
-                        
-                        regional_tariff_mask = np.array(
-                            [1 for _ in range(region_tariff_rate)]
-                            + [
-                                0
-                                for _ in range(
-                                    self.num_discrete_action_levels - region_tariff_rate
-                                )
-                            ]
-                        )
-
-                    else:
-                        pass
-                    tariff_masks.append(regional_tariff_mask)
-
-                mask_start_tariff = sum(self.savings_action_nvec
-                                    + self.mitigation_rate_action_nvec
-                                    + self.export_action_nvec
-                                    + self.import_actions_nvec)
-
-                mask_end_tariff = mask_start_tariff + sum(self.tariff_actions_nvec)
-                mask[mask_start_tariff:mask_end_tariff] = np.concatenate(tariff_masks)
+                mask_start = sum(self.savings_action_nvec)
+                mask_end = mask_start + sum(self.mitigation_rate_action_nvec)
+                mask[mask_start:mask_end] = mitigation_mask
             mask_dict[region_id] = mask
 
         return mask_dict
@@ -734,18 +651,28 @@ class Rice:
         )
         num_proposal_actions = len(self.proposal_actions_nvec)
 
-        proposed_mitigation_rate = [
+        m1_all_regions = [
             actions[region_id][
-                action_offset_index
+                action_offset_index : action_offset_index + num_proposal_actions : 2
+            ]
+            / self.num_discrete_action_levels
+            for region_id in range(self.num_regions)
+        ]
+
+        m2_all_regions = [
+            actions[region_id][
+                action_offset_index + 1 : action_offset_index + num_proposal_actions : 2
             ]
             / self.num_discrete_action_levels
             for region_id in range(self.num_regions)
         ]
 
         self.set_global_state(
-            "proposed_mitigation_rate", np.array(proposed_mitigation_rate), self.timestep
+            "promised_mitigation_rate", np.array(m1_all_regions), self.timestep
         )
-
+        self.set_global_state(
+            "requested_mitigation_rate", np.array(m2_all_regions), self.timestep
+        )
 
         obs = self.generate_observation()
         rew = {region_id: 0.0 for region_id in range(self.num_regions)}
@@ -755,7 +682,7 @@ class Rice:
 
     def evaluation_step(self, actions=None):
         """
-        Update minimum mitigation rates and tariff rates
+        Update minimum mitigation rates
         """
         assert self.negotiation_on
         assert self.stage == 2
@@ -785,27 +712,33 @@ class Rice:
         for region_id in range(self.num_regions):
             proposal_decisions[region_id, region_id] = 0
 
-        #update global states
         self.set_global_state("proposal_decisions", proposal_decisions, self.timestep)
-        
+
         for region_id in range(self.num_regions):
-
-            proposed_mitigation_rates = np.array([self.global_state["proposed_mitigation_rate"]["value"][
-                self.timestep, j
-            ] for j in range(self.num_regions)])
-
-
-            result_mitigation = proposed_mitigation_rates * proposal_decisions[region_id, :]
+            outgoing_accepted_mitigation_rates = [
+                self.global_state["promised_mitigation_rate"]["value"][
+                    self.timestep, region_id, j
+                ]
+                * self.global_state["proposal_decisions"]["value"][
+                    self.timestep, j, region_id
+                ]
+                for j in range(self.num_regions)
+            ]
+            incoming_accepted_mitigation_rates = [
+                self.global_state["requested_mitigation_rate"]["value"][
+                    self.timestep, j, region_id
+                ]
+                * self.global_state["proposal_decisions"]["value"][
+                    self.timestep, region_id, j
+                ]
+                for j in range(self.num_regions)
+            ]
 
             self.global_state["minimum_mitigation_rate_all_regions"]["value"][
                 self.timestep, region_id
             ] = max(
-                result_mitigation
+                outgoing_accepted_mitigation_rates + incoming_accepted_mitigation_rates
             )
-
-
-
-
 
         obs = self.generate_observation()
         rew = {region_id: 0.0 for region_id in range(self.num_regions)}
