@@ -139,6 +139,8 @@ class EnvWrapper(MultiAgentEnv):
 
     def __init__(self, env_config=None):
         env_config_copy = env_config.copy()
+        print(env_config_copy)
+        
         if env_config_copy is None:
             env_config_copy = {}
         source_dir = env_config_copy.get("source_dir", None)
@@ -151,6 +153,7 @@ class EnvWrapper(MultiAgentEnv):
         self.env = import_class_from_path("Rice", os.path.join(source_dir, "rice.py"))(
             **env_config_copy
         )
+        #turn off logging for training
         self.env.logging = False
         self.action_space = self.env.action_space
 

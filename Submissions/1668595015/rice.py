@@ -67,10 +67,6 @@ class Rice:
         self,
         num_discrete_action_levels=10,  # the number of discrete levels for actions, > 1
         negotiation_on=False, # If True then negotiation is on, else off
-        logging = True,
-        wandb_config = {"login": "91f4b56e70eb59889967350b045b94cd0d7bcaa8",
-                        "project": "rice_logging",
-                        "run": "basic_negotiation"} 
 
     ):
         """TODO : init docstring"""
@@ -150,7 +146,9 @@ class Rice:
 
         #enable logging
         self.logging = False#logging
-        self.wandb_config = wandb_config
+        self.wandb_config = {"login": "91f4b56e70eb59889967350b045b94cd0d7bcaa8",
+                        "project": "rice_logging",
+                        "run": "basic_negotiation"} 
 
         # Negotiation-related initializations
         if self.negotiation_on:
