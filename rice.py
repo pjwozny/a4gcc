@@ -14,12 +14,9 @@ import sys
 
 import numpy as np
 from gym.spaces import MultiDiscrete
-#from negotiator import Negotiator
 
 import importlib
 
-# equiv. of your `import matplotlib.text as text`
-negotiator_cls = getattr(importlib.import_module('negotiator'), 'Negotiator')
 
 
 _PUBLIC_REPO_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -74,6 +71,10 @@ class Rice:
         self,
         num_discrete_action_levels=10,  # the number of discrete levels for actions, > 1
         negotiation_on=False,  # If True then negotiation is on, else off
+        negotiator_class_config={
+            "file_name":"negotiator",
+            "class_name":"Negotiator"
+        }
     ):
         """TODO : init docstring"""
         assert (
@@ -90,6 +91,12 @@ class Rice:
         )
         # TODO : add to yaml
         self.balance_interest_rate = 0.1
+
+        #
+        # equiv. of your `import matplotlib.text as text`
+        negotiator_cls = getattr(importlib.import_module(negotiator_class_config["file_name"]),
+                                     negotiator_class_config["class_name"])
+
 
         self.num_regions = num_regions
         self.rice_constant = params["_RICE_CONSTANT"]
@@ -497,8 +504,11 @@ class Rice:
 
             features_dict[region_id] = all_features
 
-        # Fetch the action mask dictionary, keyed by region_id.
-        action_mask_dict = self.negotiator.generate_action_mask()
+        if self.negotiation_on:
+            # Fetch the action mask dictionary, keyed by region_id.
+            action_mask_dict = self.negotiator.generate_action_mask()
+        else:
+            action_mask_dict = self.generate_action_mask()
 
         # Form the observation dictionary keyed by region id.
         obs_dict = {}

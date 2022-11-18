@@ -1,8 +1,28 @@
 import numpy as np
 
 class Negotiator():
+
+  """
+  Basic Bi-lateral negotiation included as the original
+  example
+
+  Attributes:
+        rice: instance of RICE-N model
+        stages (list(dict)): function steps that this negotiator class performs,
+                             each contains a function and number of actions 
+                             used by the function
+        num_negotiation_stages (int): number of stages in total
+  
+  """
   
   def __init__(self, rice):
+    """
+    Defines necessary parameters for communication
+    with rice class
+
+    Args:
+        Rice: instance of RICE-N model
+    """
     self.rice = rice
     self.stages = [
       {
