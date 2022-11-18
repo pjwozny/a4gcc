@@ -493,7 +493,7 @@ if __name__ == "__main__":
 
     with open(config_path, "r", encoding="utf8") as fp:
         run_config = yaml.safe_load(fp)
-
+    print(run_config)
     # Create trainer
     # --------------
     trainer, save_dir = create_trainer(run_config)
@@ -502,7 +502,10 @@ if __name__ == "__main__":
     # ------------------------------------------------
     os.makedirs(save_dir)
     # Copy source files to the saving directory
-    for file in ["rice.py", "rice_helpers.py", "negotiator.py"]:
+    negotiator_file_location=run_config["env"]["negotiator_class_config"]["file_name"]
+    for file in ["rice.py",
+                 "rice_helpers.py",
+                f"{negotiator_file_location}.py"]:
         shutil.copyfile(
             os.path.join(PUBLIC_REPO_DIR, file),
             os.path.join(save_dir, file),
