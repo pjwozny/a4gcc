@@ -32,7 +32,7 @@ env:
     negotiation_on: True # flag to indicate whether negotiation is allowed or not
     negotiator_class_config:
         file_name: "negotiator"
-        class_name: "BilateralNegotiatorWithTariff"
+        class_name: "BilateralNegotiatorWithOnlyTariff"
 # Policy network settings
 policy:
     regions:
