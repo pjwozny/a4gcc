@@ -73,7 +73,7 @@ class Rice:
         negotiation_on=False,  # If True then negotiation is on, else off
         negotiator_class_config={
             "file_name":"negotiator",
-            "class_name":"Negotiator"
+            "class_name":"BilateralNegotiator"
         }
     ):
         """TODO : init docstring"""
