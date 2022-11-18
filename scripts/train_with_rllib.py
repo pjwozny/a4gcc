@@ -502,7 +502,7 @@ if __name__ == "__main__":
     # ------------------------------------------------
     os.makedirs(save_dir)
     # Copy source files to the saving directory
-    for file in ["rice.py", "rice_helpers.py"]:
+    for file in ["rice.py", "rice_helpers.py", "negotiator.py"]:
         shutil.copyfile(
             os.path.join(PUBLIC_REPO_DIR, file),
             os.path.join(save_dir, file),
