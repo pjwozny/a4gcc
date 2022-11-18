@@ -493,7 +493,6 @@ if __name__ == "__main__":
 
     with open(config_path, "r", encoding="utf8") as fp:
         run_config = yaml.safe_load(fp)
-    print(run_config)
     # Create trainer
     # --------------
     trainer, save_dir = create_trainer(run_config)
