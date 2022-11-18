@@ -229,3 +229,6 @@ Draw_graphs.ipynb
 *.txt
 core
 .tmp
+
+#logging
+wandb/
