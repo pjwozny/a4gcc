@@ -17,6 +17,17 @@ from gym.spaces import MultiDiscrete
 
 import importlib
 
+from negotiator import (
+    BilateralNegotiatorWithOnlyTariff,
+    BilateralNegotiatorWithTariff,
+    BilateralNegotiator
+)
+
+NEGOTIATION_PROTOCOLS = {
+    "BilateralNegotiatorWithOnlyTariff": BilateralNegotiatorWithOnlyTariff,
+    "BilateralNegotiatorWithTariff": BilateralNegotiatorWithOnlyTariff,
+    "BilateralNegotiator":BilateralNegotiator
+}
 
 
 _PUBLIC_REPO_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -72,7 +83,6 @@ class Rice:
         num_discrete_action_levels=10,  # the number of discrete levels for actions, > 1
         negotiation_on=False,  # If True then negotiation is on, else off
         negotiator_class_config={
-            "file_name":"negotiator",
             "class_name":"BilateralNegotiator"
         }
     ):
@@ -94,8 +104,7 @@ class Rice:
 
         #
         # equiv. of your `import matplotlib.text as text`
-        negotiator_cls = getattr(importlib.import_module(negotiator_class_config["file_name"]),
-                                     negotiator_class_config["class_name"])
+        negotiator_cls = NEGOTIATION_PROTOCOLS[negotiator_class_config["class_name"]]
 
 
         self.num_regions = num_regions
