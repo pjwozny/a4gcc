@@ -11,7 +11,10 @@ Regional Integrated model of Climate and the Economy (RICE)
 import logging
 import os
 import sys
-
+import wandb
+from datetime import datetime
+import re
+from random import randint
 import numpy as np
 from gym.spaces import MultiDiscrete
 
@@ -81,6 +84,12 @@ class Rice:
     def __init__(
         self,
         num_discrete_action_levels=10,  # the number of discrete levels for actions, > 1
+        negotiation_on=False, # If True then negotiation is on, else off
+        logging = True,
+        wandb_config = {"login": "91f4b56e70eb59889967350b045b94cd0d7bcaa8",
+                        "project": "rice_logging",
+                        "run": "basic_negotiation",
+                        "entity":"ai4gcc"}, 
         negotiation_on=False,  # If True then negotiation is on, else off
         negotiator_class_config={
             "class_name":"BilateralNegotiator"
@@ -165,6 +174,10 @@ class Rice:
             + self.import_actions_nvec
             + self.tariff_actions_nvec
         )
+
+        #enable logging
+        self.logging = logging
+        self.wandb_config = wandb_config
 
         # Negotiation-related initializations
         if self.negotiation_on:
@@ -388,6 +401,11 @@ class Rice:
         self.set_global_state(
             "timestep", self.timestep, self.timestep, dtype=self.int_dtype
         )
+
+        #if simulation ended create log
+        if self.timestep == self.episode_length-1:
+            self.log_metrics()
+
         if self.negotiation_on:
             # Note: The '+1` below is for the climate_and_economy_simulation_step
             self.stage = self.timestep % (self.num_negotiation_stages + 1)
@@ -398,6 +416,96 @@ class Rice:
                 return self.negotiator.stages[self.stage-1]["function"](actions)
 
         return self.climate_and_economy_simulation_step(actions)
+
+    def log_metrics(self):
+        #only log a 10th of the runs
+        if self.logging:
+        
+            timestamp = re.sub("[^0-9]", "", str(datetime.now())) + str(randint(100, 999))
+            
+            wandb.login(key=self.wandb_config["login"])
+            wandb.init(project=self.wandb_config["project"],
+             name=f'{self.wandb_config["run"]}_{timestamp}',
+             entity=self.wandb_config["entity"])
+
+            country_data =[
+                "capital_depreciation_all_regions",
+                "savings_all_regions",
+                "mitigation_rate_all_regions",
+                "max_export_limit_all_regions",
+                "mitigation_cost_all_regions",
+                "damages_all_regions",
+                "abatement_cost_all_regions",
+                "utility_all_regions",
+                "social_welfare_all_regions",
+                "reward_all_regions",
+                ]
+
+            global_features = [
+                "global_temperature",
+                "global_carbon_mass",
+                "global_exogenous_emissions",
+                "global_land_emissions",
+            ]
+
+            for key in global_features:
+                current_data = []
+                time_steps_for_plotting = []
+                multi_line = False
+                for step in range(1,self.episode_length-1):
+
+                    step_data = self.get_global_state(key, step)
+                    if len(step_data) == 1:
+                        wandb.log({key:step_data[0]})
+                    else:
+                        multi_line = True
+                        current_data.append(step_data)
+                        time_steps_for_plotting.append(step)
+                if multi_line:
+                    #multi-line plot
+                    wandb.log({key : wandb.plot.line_series(
+                            xs=time_steps_for_plotting, 
+                            ys=np.array(current_data).transpose().tolist(),
+                            title=key,
+                            xname="timesteps")})
+
+                
+            #average mitigation_rate
+            for key in country_data:
+
+                current_data = []
+                time_steps_for_plotting = []
+                for step in range(1,self.episode_length-1):
+                    
+                    #get values for this timestep
+                    rates = [self.global_state[key]["value"][
+                    step, idx
+                    ] * self.num_discrete_action_levels for idx in range(self.num_regions)]
+
+                    #store data for line plot
+                    current_data.append(rates)
+                    time_steps_for_plotting.append(step)
+
+                    #average across all countries
+                    wandb.log({f"average{key}":np.mean(rates)})
+
+                    #histogram p country
+                    wandb.log({
+                        f"mitigation{key}Histogram":wandb.Histogram(
+                            np.array(rates) / step
+                        )
+                    })
+
+                #multi-line plot
+                wandb.log({key : wandb.plot.line_series(
+                        xs=time_steps_for_plotting, 
+                        ys=np.array(current_data).transpose().tolist(),
+                        keys=[f"region_{idx}" for idx in range(self.num_regions)],
+                        title=key,
+                        xname="timesteps")})
+
+
+            wandb.finish()
 
     def generate_observation(self):
         """
