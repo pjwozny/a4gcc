@@ -504,7 +504,10 @@ if __name__ == "__main__":
     # ------------------------------------------------
     os.makedirs(save_dir)
     # Copy source files to the saving directory
-    for file in ["rice.py", "rice_helpers.py"]:
+    negotiator_file_location=run_config["env"]["negotiator_class_config"]["file_name"]
+    for file in ["rice.py",
+                 "rice_helpers.py",
+                f"{negotiator_file_location}.py"]:
         shutil.copyfile(
             os.path.join(PUBLIC_REPO_DIR, file),
             os.path.join(save_dir, file),
@@ -540,6 +543,7 @@ if __name__ == "__main__":
         ):
             save_model_checkpoint(trainer, save_dir, total_timesteps)
             logging.info(result)
+
         print(f"""episode_reward_mean: {result.get('episode_reward_mean')}""")
 
     # Create a (zipped) submission file
