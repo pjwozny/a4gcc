@@ -90,7 +90,6 @@ class Rice:
                         "project": "rice_logging",
                         "run": "basic_negotiation",
                         "entity":"ai4gcc"}, 
-        negotiation_on=False,  # If True then negotiation is on, else off
         negotiator_class_config={
             "class_name":"BilateralNegotiator"
         }
