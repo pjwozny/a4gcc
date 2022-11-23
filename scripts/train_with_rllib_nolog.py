@@ -139,7 +139,6 @@ class EnvWrapper(MultiAgentEnv):
 
     def __init__(self, env_config=None):
         env_config_copy = env_config.copy()
-        print(env_config_copy)
         
         if env_config_copy is None:
             env_config_copy = {}

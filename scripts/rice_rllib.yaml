@@ -30,11 +30,12 @@ trainer:
 env:
     num_discrete_action_levels: 10 # number of discrete levels for the saving and mitigation actions
     negotiation_on: False # flag to indicate whether negotiation is allowed or not
-    logging: False #default logging to false so that
+    logging: True #default logging to false so that
     wandb_config:
         login: "91f4b56e70eb59889967350b045b94cd0d7bcaa8"
         project: "rice_logging"
         run: "basic_negotiation"
+        entity: "ai4gcc"
 
 
 # Policy network settings

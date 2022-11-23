@@ -70,7 +70,8 @@ class Rice:
         logging = True,
         wandb_config = {"login": "91f4b56e70eb59889967350b045b94cd0d7bcaa8",
                         "project": "rice_logging",
-                        "run": "basic_negotiation"} 
+                        "run": "basic_negotiation",
+                        "entity":"ai4gcc"} 
 
     ):
         """TODO : init docstring"""
@@ -149,7 +150,7 @@ class Rice:
         )
 
         #enable logging
-        self.logging = False#logging
+        self.logging = logging
         self.wandb_config = wandb_config
 
         # Negotiation-related initializations
@@ -399,7 +400,9 @@ class Rice:
             timestamp = re.sub("[^0-9]", "", str(datetime.now())) + str(randint(100, 999))
             
             wandb.login(key=self.wandb_config["login"])
-            wandb.init(project=self.wandb_config["project"], name=f'{self.wandb_config["run"]}_{timestamp}')
+            wandb.init(project=self.wandb_config["project"],
+             name=f'{self.wandb_config["run"]}_{timestamp}',
+             entity=self.wandb_config["entity"])
 
             country_data =[
                 "capital_depreciation_all_regions",
