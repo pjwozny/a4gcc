@@ -229,3 +229,10 @@ Draw_graphs.ipynb
 *.txt
 core
 .tmp
+
+#logging
+wandb/
+
+#submissions as state dicts can be quite large
+Submissions/
+
