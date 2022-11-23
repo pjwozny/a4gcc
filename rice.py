@@ -18,6 +18,21 @@ from random import randint
 import numpy as np
 from gym.spaces import MultiDiscrete
 
+import importlib
+
+from negotiator import (
+    BilateralNegotiatorWithOnlyTariff,
+    BilateralNegotiatorWithTariff,
+    BilateralNegotiator
+)
+
+NEGOTIATION_PROTOCOLS = {
+    "BilateralNegotiatorWithOnlyTariff": BilateralNegotiatorWithOnlyTariff,
+    "BilateralNegotiatorWithTariff": BilateralNegotiatorWithOnlyTariff,
+    "BilateralNegotiator":BilateralNegotiator
+}
+
+
 _PUBLIC_REPO_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path = [_PUBLIC_REPO_DIR] + sys.path
 
@@ -46,11 +61,14 @@ from rice_helpers import (
     set_rice_params,
 )
 
+
+
 # Set logger level e.g., DEBUG, INFO, WARNING, ERROR.
 logging.getLogger().setLevel(logging.ERROR)
 
 _FEATURES = "features"
 _ACTION_MASK = "action_mask"
+
 
 
 class Rice:
@@ -71,8 +89,11 @@ class Rice:
         wandb_config = {"login": "91f4b56e70eb59889967350b045b94cd0d7bcaa8",
                         "project": "rice_logging",
                         "run": "basic_negotiation",
-                        "entity":"ai4gcc"} 
-
+                        "entity":"ai4gcc"}, 
+        negotiation_on=False,  # If True then negotiation is on, else off
+        negotiator_class_config={
+            "class_name":"BilateralNegotiator"
+        }
     ):
         """TODO : init docstring"""
         assert (
@@ -89,6 +110,11 @@ class Rice:
         )
         # TODO : add to yaml
         self.balance_interest_rate = 0.1
+
+        #
+        # equiv. of your `import matplotlib.text as text`
+        negotiator_cls = NEGOTIATION_PROTOCOLS[negotiator_class_config["class_name"]]
+
 
         self.num_regions = num_regions
         self.rice_constant = params["_RICE_CONSTANT"]
@@ -156,20 +182,21 @@ class Rice:
         # Negotiation-related initializations
         if self.negotiation_on:
             self.stage = 0
+
+            self.negotiator = negotiator_cls(self)
+
             self.num_negotiation_stages = 2  # proposal and evaluation steps
             self.episode_length += (
-                self.dice_constant["xN"] * self.num_negotiation_stages
+                self.dice_constant["xN"] * self.negotiator.num_negotiation_stages
             )
 
             # Each region proposes to each other region
             # self mitigation and their mitigation values
-            self.proposal_actions_nvec = (
-                [self.num_discrete_action_levels] * 2 * self.num_regions
-            )
+            self.proposal_actions_nvec = self.negotiator.stages[0]["numberActions"]
 
             # Each region evaluates a proposal from every other region,
             # either accept or reject.
-            self.evaluation_actions_nvec = [2] * self.num_regions
+            self.evaluation_actions_nvec = self.negotiator.stages[1]["numberActions"]
 
             self.actions_nvec += (
                 self.proposal_actions_nvec + self.evaluation_actions_nvec
@@ -385,11 +412,8 @@ class Rice:
             self.set_global_state(
                 "stage", self.stage, self.timestep, dtype=self.int_dtype
             )
-            if self.stage == 1:
-                return self.proposal_step(actions)
-
-            if self.stage == 2:
-                return self.evaluation_step(actions)
+            if self.stage != 0:
+                return self.negotiator.stages[self.stage-1]["function"](actions)
 
         return self.climate_and_economy_simulation_step(actions)
 
@@ -575,7 +599,7 @@ class Rice:
                         self.global_state[feature]["value"][self.timestep, region_id]
                         / self.global_state[feature]["norm"]
                     ),
-                )
+                ) 
 
             for feature in bilateral_features:
                 assert self.global_state[feature]["value"].shape[1] == self.num_regions
@@ -597,8 +621,11 @@ class Rice:
 
             features_dict[region_id] = all_features
 
-        # Fetch the action mask dictionary, keyed by region_id.
-        action_mask_dict = self.generate_action_mask()
+        if self.negotiation_on:
+            # Fetch the action mask dictionary, keyed by region_id.
+            action_mask_dict = self.negotiator.generate_action_mask()
+        else:
+            action_mask_dict = self.generate_action_mask()
 
         # Form the observation dictionary keyed by region id.
         obs_dict = {}
@@ -693,7 +720,8 @@ class Rice:
         """
         Update minimum mitigation rates
         """
-        assert self.negotiation_on
+        assert self.negotiation_on 
+        
         assert self.stage == 2
 
         assert isinstance(actions, dict)

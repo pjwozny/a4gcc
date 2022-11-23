@@ -36,7 +36,9 @@ env:
         project: "rice_logging"
         run: "basic_negotiation"
         entity: "ai4gcc"
-
+    negotiator_class_config:
+        file_name: "negotiator"
+        class_name: "BilateralNegotiatorWithOnlyTariff"
 
 # Policy network settings
 policy:
