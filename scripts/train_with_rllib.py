@@ -246,9 +246,7 @@ def save_model_checkpoint(trainer_obj=None, save_directory=None, current_timeste
             save_directory,
             f"{policy}_{current_timestep}.state_dict",
         )
-        logging.info(
-            "Saving the model checkpoints for policy %s to %s.", (policy, filepath)
-        )
+        logging.info("Saving the model checkpoints for policy %s to %s.", policy, filepath)
         torch.save(model_params[policy], filepath)
 
 
