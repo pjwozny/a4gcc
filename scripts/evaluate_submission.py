@@ -168,7 +168,7 @@ def validate_dir(results_dir=None):
     return framework, success, comment
 
 
-def compute_metrics(fetch_episode_states, trainer, framework, num_episodes=1, log=True):
+def compute_metrics(fetch_episode_states, trainer, framework, num_episodes=1):
     """
     Generate episode rollouts and compute metrics.
     """
@@ -178,14 +178,16 @@ def compute_metrics(fetch_episode_states, trainer, framework, num_episodes=1, lo
         framework in available_frameworks
     ), f"Invalid framework {framework}, should be in f{available_frameworks}."
 
-    if log:
-        config_fp = Path("scripts") / "rice_rllib.yaml"
-        with open(config_fp, "r", encoding="utf8") as fp:
-            wandb_config = yaml.safe_load(fp)["env"]["wandb_config"]
-        wandb.login(key=wandb_config["login"])
-        wandb.init(project=wandb_config["project"],
-            name=f'{wandb_config["run"]}_{time.strftime("%Y-%m-%d_%H%M%S")}',
-            entity=wandb_config["entity"])
+
+    config_fp = Path("scripts") / "rice_rllib.yaml"
+    with open(config_fp, "r", encoding="utf8") as fp:
+        env_config = yaml.safe_load(fp)["env"]
+
+    if env_config["logging"]:
+        wandb.login(key=env_config["wandb_config"]["login"])
+        wandb.init(project=env_config["wandb_config"]["project"],
+            name=f'{env_config["wandb_config"]["run"]}_{time.strftime("%Y-%m-%d_%H%M%S")}',
+            entity=env_config["wandb_config"]["entity"])
 
     # Fetch all the desired outputs to compute various metrics.
     desired_outputs = list(_METRICS_TO_LABEL_DICT.keys())
@@ -237,7 +239,7 @@ def compute_metrics(fetch_episode_states, trainer, framework, num_episodes=1, lo
             )
 
 
-            if log:
+            if env_config["logging"]:
                 wandb.log({feature : wandb.plot.line_series(
                        xs=list(range(episode_states[episode_id][feature].shape[0])),
                        ys=episode_states[episode_id][feature].T.tolist(),
@@ -253,7 +255,7 @@ def compute_metrics(fetch_episode_states, trainer, framework, num_episodes=1, lo
         comment = "Could not obtain an episode rollout!"
         eval_metrics = {}
 
-    if log:
+    if env_config["logging"]:
         wandb.finish()
 
     return success, comment, eval_metrics
