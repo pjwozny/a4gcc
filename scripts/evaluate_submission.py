@@ -45,16 +45,47 @@ _INDEXES_FILENAME = "climate_economic_min_max_indices.txt"
 _METRICS_TO_LABEL_DICT = OrderedDict()
 # Read the dict values below as
 # (label, decimal points used to round off value: 0 becomes an integer)
-_METRICS_TO_LABEL_DICT["reward_all_regions"] = ("Episode Reward", 2)
 _METRICS_TO_LABEL_DICT["global_temperature"] = ("Temperature Rise", 2)
-_METRICS_TO_LABEL_DICT["global_carbon_mass"] = ("Carbon Mass", 0)
-_METRICS_TO_LABEL_DICT["capital_all_regions"] = ("Capital", 0)
-_METRICS_TO_LABEL_DICT["production_all_regions"] = ("Production", 0)
-_METRICS_TO_LABEL_DICT["gross_output_all_regions"] = ("Gross Output", 0)
-_METRICS_TO_LABEL_DICT["investment_all_regions"] = ("Investment", 0)
-_METRICS_TO_LABEL_DICT["abatement_cost_all_regions"] = ("Abatement Cost", 2)
+_METRICS_TO_LABEL_DICT["global_carbon_mass"] = ("Carbon Mass", 2)
+_METRICS_TO_LABEL_DICT["capital_all_regions"] = ("Capital", 2)
+_METRICS_TO_LABEL_DICT["labor_all_regions"] = ("Labor", 2)
+_METRICS_TO_LABEL_DICT["production_factor_all_regions"] = ("Production Factor", 2)
+_METRICS_TO_LABEL_DICT["production_all_regions"] = ("Production", 2)
+_METRICS_TO_LABEL_DICT["intensity_all_regions"] = ("Intensity", 2)
+# _METRICS_TO_LABEL_DICT["global_exegenous_emissions"] = ("Exogenous Emissions", 2)
+_METRICS_TO_LABEL_DICT["global_land_emissions"] = ("Land Emissions", 2)
+# _METRICS_TO_LABEL_DICT["capital_deprication_all_regions"] = ("Capital Deprication", 2)
+_METRICS_TO_LABEL_DICT["savings_all_regions"] = ("Savings", 2)
 _METRICS_TO_LABEL_DICT["mitigation_rate_all_regions"] = ("Mitigation Rate", 0)
-_METRICS_TO_LABEL_DICT["consumption_all_regions"] = ("Consumption", 0)
+_METRICS_TO_LABEL_DICT["max_export_limit_all_regions"] = ("Max Export Limit", 2)
+_METRICS_TO_LABEL_DICT["mitigation_cost_all_regions"] = ("Mitigation Cost", 2)
+_METRICS_TO_LABEL_DICT["damages_all_regions"] = ("Damages", 2)
+_METRICS_TO_LABEL_DICT["abatement_cost_all_regions"] = ("Abatement Cost", 2)
+_METRICS_TO_LABEL_DICT["utility_all_regions"] = ("Utility", 2)
+_METRICS_TO_LABEL_DICT["social_welfare_all_regions"] = ("Social Welfare", 2)
+_METRICS_TO_LABEL_DICT["reward_all_regions"] = ("Reward", 2)
+_METRICS_TO_LABEL_DICT["consumption_all_regions"] = ("Consumption", 2)
+_METRICS_TO_LABEL_DICT["current_balance_all_regions"] = ("Current Balance", 2)
+_METRICS_TO_LABEL_DICT["gross_output_all_regions"] = ("Gross Output", 2)
+_METRICS_TO_LABEL_DICT["investment_all_regions"] = ("Investment", 2)
+_METRICS_TO_LABEL_DICT["production_all_regions"] = ("Production", 2)
+# _METRICS_TO_LABEL_DICT["minimum_mitigation_rate_all_regions"] = ("Minimum Mitigation Rate", 0)
+# _METRICS_TO_LABEL_DICT["
+# _METRICS_TO_LABEL_DICT["
+
+# _METRICS_TO_LABEL_DICT["gross_output_all_regions"] = ("Gross Output", 0)
+# _METRICS_TO_LABEL_DICT["investment_all_regions"] = ("Investment", 0)
+# _METRICS_TO_LABEL_DICT["abatement_cost_all_regions"] = ("Abatement Cost", 2)
+# _METRICS_TO_LABEL_DICT["mitigation_rate_all_regions"] = ("Mitigation Rate", 0)
+
+# _METRICS_TO_LABEL_DICT["consumption_all_regions"] = ("Consumption", 0)
+# # _METRICS_TO_LABEL_DICT["current_balance_all_regions"]
+# # _METRICS_TO_LABEL_DICT["current_balance_all_regions"]
+# # _METRICS_TO_LABEL_DICT["current_balance_all_regions"]
+# # _METRICS_TO_LABEL_DICT["current_balance_all_regions"]
+# # _METRICS_TO_LABEL_DICT["current_balance_all_regions"]
+
+# _METRICS_TO_LABEL_DICT["reward_all_regions"] = ("Episode Reward", 2)
 
 
 def get_imports(framework=None):
@@ -240,11 +271,17 @@ def compute_metrics(fetch_episode_states, trainer, framework, num_episodes=1):
 
 
             if env_config["logging"]:
+                if env_config["negotiation_on"]:
+                    ys = episode_states[episode_id][feature][0::3].T.tolist()
+                else:
+                    ys = episode_states[episode_id][feature].T.tolist()
+
+                xs = list(range(len(ys[0])))
                 wandb.log({feature : wandb.plot.line_series(
-                       xs=list(range(episode_states[episode_id][feature].shape[0])),
-                       ys=episode_states[episode_id][feature].T.tolist(),
-                       keys=[f"region_{x}" for x in range(episode_states[episode_id][feature].shape[1])],
-                       title=metrics_to_label_dict[0],
+                       xs=xs,
+                       ys=ys,
+                       keys=[f"region_{x}" for x in range(len(ys))],
+                       title=feature,
                        xname="Steps")})
 
         success = True
