@@ -12,45 +12,35 @@ https://docs.ray.io/en/latest/rllib-training.html
 
 import logging
 import os
-import sys
 import shutil
+import sys
 import time
 from pathlib import Path
 
 import ray
 import torch
+import wandb
 import yaml
-from ray.rllib.agents.a3c import A2CTrainer
+from ray.rllib.algorithms.a2c import A2C
+from ray.rllib.algorithms.algorithm import Algorithm
 from ray.rllib.models import ModelCatalog
 
 from scripts.fixed_paths import PUBLIC_REPO_DIR
+
 sys.path.append(PUBLIC_REPO_DIR)
 
 from scripts.create_submission_zip import prepare_submission
 from scripts.environment_wrapper import EnvWrapper
+from scripts.evaluate_submission import perform_evaluation
 from scripts.torch_models import TorchLinear
 
 ModelCatalog.register_custom_model("torch_linear", TorchLinear)
 
 
 
-def train():
-    # Read the run configurations specific to the environment.
-    # Note: The run config yaml(s) can be edited at warp_drive/training/run_configs
+def train(run_config, save_dir):
+    # Copy relevant source files
     # ------------------------------------------------
-    config_path = Path() / "scripts" / "rice_rllib.yaml"
-    if not config_path.exists():
-        raise ValueError(
-            "The run configuration is missing. Please make sure the correct path is specified."
-        )
-
-    with open(config_path, "r", encoding="utf8") as fp:
-        run_config = yaml.safe_load(fp)
-
-    # Create an experiment directory and copy relevant source files
-    # ------------------------------------------------
-    save_dir = Path("experiments") / time.strftime("%Y-%m-%d_%H%M%S")
-    save_dir.mkdir(parents=True)
     copy_files = ["rice.py", "negotiator.py", "rice_helpers.py", "scripts/rice_rllib.yaml"]
     for file in copy_files:
         shutil.copy(file, save_dir)
@@ -69,8 +59,8 @@ def train():
     train_batch_size = run_config["trainer"]["train_batch_size"]
     model_save_freq = run_config["saving"]["model_params_save_freq"]
     # Fetch the env object from the trainer
-    env_obj = trainer.workers.local_worker().env.env
-    episode_length = env_obj.episode_length
+    # trainer.
+    episode_length = EnvWrapper(run_config["env"]).episode_length
     num_iters = (num_episodes * episode_length) // train_batch_size
 
     for iteration in range(num_iters):
@@ -203,7 +193,7 @@ def load_model_checkpoints(trainer_obj=None, save_directory=None, ckpt_idx=-1):
     trainer_obj.set_weights(model_params)
 
 
-def create_trainer(run_config, seed=None):
+def create_trainer(run_config, seed=None) -> Algorithm:
     """
     Create the RLlib trainer.
     """
@@ -212,7 +202,7 @@ def create_trainer(run_config, seed=None):
     trainer_config = get_rllib_config(
         run_config=run_config, env_class=EnvWrapper, seed=seed
     )
-    rllib_trainer = A2CTrainer(
+    rllib_trainer = A2C(
         env=EnvWrapper,
         config=trainer_config,
     )
@@ -220,4 +210,40 @@ def create_trainer(run_config, seed=None):
 
 
 if __name__ == "__main__":
-    train()
+    # Read the run configurations specific to the environment.
+    # Note: The run config yaml(s) can be edited at warp_drive/training/run_configs
+    # ------------------------------------------------
+    config_path = Path() / "scripts" / "rice_rllib.yaml"
+    if not config_path.exists():
+        raise ValueError(
+            "The run configuration is missing. Please make sure the correct path is specified."
+        )
+
+    with open(config_path, "r", encoding="utf8") as fp:
+        run_config = yaml.safe_load(fp)
+    
+    # Create the save directory
+    save_dir = Path("experiments") / time.strftime("%Y-%m-%d_%H%M%S")
+    save_dir.mkdir(parents=True)
+
+    # Initialize wandb
+    if run_config["env"]["logging"]:
+        wandb_config = run_config["env"]["wandb_config"]
+        wandb.login(key=wandb_config["login"])
+        wandb.init(project=wandb_config["project"],
+            name=f'{wandb_config["run"]}_{time.strftime("%Y-%m-%d_%H%M%S")}',
+            entity=wandb_config["entity"])
+
+    # Write timestamp of start training
+    with open(save_dir / "timestamp.txt", "a") as f:
+        f.write(f"START:\t{time.strftime('%Y-%m-%d_%H:%M:%S')}\n")
+    train(run_config, save_dir)
+    # Write timestamp of finished training
+    with open(save_dir / "timestamp.txt", "a") as f:
+        f.write(f"STOP:\t{time.strftime('%Y-%m-%d_%H:%M:%S')}\n")
+
+    # framework_used, succeeded, metrics, comments = perform_evaluation(save_dir)
+    # print(f"Framework used: {framework_used}")
+    # print(f"Succeeded: {succeeded}")
+    # print(f"Metrics: {metrics}")
+    # print(f"Comments: {comments}")
