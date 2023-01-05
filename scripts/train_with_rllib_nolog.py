@@ -16,8 +16,9 @@ import shutil
 import subprocess
 import sys
 import time
-
+import wandb
 import numpy as np
+from tqdm import tqdm
 import yaml
 from run_unittests import import_class_from_path
 from desired_outputs import desired_outputs
@@ -424,8 +425,10 @@ def trainer(
     # Copy the source files into the results directory
     # ------------------------------------------------
     os.makedirs(save_dir)
-    # Copy source files to the saving directory
-    for file in ["rice.py", "rice_helpers.py"]:
+    negotiator_file_location=run_config["env"]["negotiator_class_config"]["file_name"]
+    for file in ["rice.py",
+                 "rice_helpers.py",
+                f"{negotiator_file_location}.py"]:
         shutil.copyfile(
             os.path.join(PUBLIC_REPO_DIR, file),
             os.path.join(save_dir, file),
@@ -450,7 +453,7 @@ def trainer(
     env_obj = trainer.workers.local_worker().env.env
     episode_length = env_obj.episode_length
     num_iters = (num_episodes * episode_length) // train_batch_size
-
+    num_iters = 5
     for iteration in range(num_iters):
         print(f"********** Iter : {iteration + 1:5d} / {num_iters:5d} **********")
         result = trainer.train()
@@ -528,12 +531,19 @@ if __name__ == "__main__":
     trainer_config = run_config["trainer"]
     num_episodes = trainer_config["num_episodes"]
     train_batch_size = trainer_config["train_batch_size"]
+    logging_config = run_config["env"]["wandb_config"]
     # Fetch the env object from the trainer
     env_obj = trainer.workers.local_worker().env.env
     episode_length = env_obj.episode_length
     num_iters = (num_episodes * episode_length) // train_batch_size
 
-    for iteration in range(num_iters):
+    #init logging
+    wandb.login(key=logging_config["login"])
+    wandb.init(project=logging_config["project"],
+    name=f'{logging_config["run"]}_{run_config["env"]["negotiator_class_config"]["class_name"]}',
+    entity=logging_config["entity"])
+    num_iters = 150
+    for iteration in tqdm(range(num_iters)):
         print(f"********** Iter : {iteration + 1:5d} / {num_iters:5d} **********")
         result = trainer.train()
         total_timesteps = result.get("timesteps_total")
@@ -543,7 +553,13 @@ if __name__ == "__main__":
         ):
             save_model_checkpoint(trainer, save_dir, total_timesteps)
             logging.info(result)
+        print()
+        for key, val in result["info"]["learner"]["regions"].items():
+            if np.isscalar(val):
+                wandb.log({key:val})
+        
 
+        wandb.log({"reward_mean":result.get("episode_reward_mean")})
         print(f"""episode_reward_mean: {result.get('episode_reward_mean')}""")
 
     # Create a (zipped) submission file
@@ -557,5 +573,16 @@ if __name__ == "__main__":
         ]
     )
 
+    #update config:
+    data = run_config
+    data["saving"]["results_dir"] = save_dir
+    with open(os.path.join(PUBLIC_REPO_DIR, "scripts", "rice_rllib.yaml"), 'w') as outfile:
+        yaml.dump(data, outfile, default_flow_style=False)
+
+    #log training curves
+    # data = get_training_curve("Submissions/"+save_dir.split("/")[-1]+".zip")
+    # print("data")
+    # print(data)
+    wandb.finish()
     # Close Ray gracefully after completion
     ray.shutdown()
