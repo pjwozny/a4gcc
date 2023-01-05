@@ -18,18 +18,27 @@ from random import randint
 import numpy as np
 from gym.spaces import MultiDiscrete
 
-import importlib
 
 from negotiator import (
+    BilateralNegotiatorWithTariffAndBonus,
+    BilateralNegotiatorWithOnlyTariffAndBonus,
     BilateralNegotiatorWithOnlyTariff,
     BilateralNegotiatorWithTariff,
-    BilateralNegotiator
+    BilateralNegotiator,
+    MaxMitigation,
+    MinMitigation,
+    MaxMitigationViaEval
 )
 
 NEGOTIATION_PROTOCOLS = {
+    "BilateralNegotiatorWithTariffAndBonus":BilateralNegotiatorWithTariffAndBonus,
+    "BilateralNegotiatorWithOnlyTariffAndBonus":BilateralNegotiatorWithOnlyTariffAndBonus,
     "BilateralNegotiatorWithOnlyTariff": BilateralNegotiatorWithOnlyTariff,
-    "BilateralNegotiatorWithTariff": BilateralNegotiatorWithOnlyTariff,
-    "BilateralNegotiator":BilateralNegotiator
+    "BilateralNegotiatorWithTariff": BilateralNegotiatorWithTariff,
+    "BilateralNegotiator":BilateralNegotiator,
+    "MaxMitigation":MaxMitigation,
+    "MinMitigation":MinMitigation,
+    "MaxMitigationViaEval":MaxMitigationViaEval
 }
 
 
@@ -111,8 +120,9 @@ class Rice:
         self.balance_interest_rate = 0.1
 
         #
+        self.negotiator_class_config = negotiator_class_config
         # equiv. of your `import matplotlib.text as text`
-        negotiator_cls = NEGOTIATION_PROTOCOLS[negotiator_class_config["class_name"]]
+        negotiator_cls = NEGOTIATION_PROTOCOLS[self.negotiator_class_config["class_name"]]
 
 
         self.num_regions = num_regions
@@ -424,7 +434,7 @@ class Rice:
             
             wandb.login(key=self.wandb_config["login"])
             wandb.init(project=self.wandb_config["project"],
-             name=f'{self.wandb_config["run"]}_{timestamp}',
+             name=f'{self.wandb_config["run"]}_{self.negotiator_class_config["class_name"]}',
              entity=self.wandb_config["entity"])
 
             country_data =[
@@ -827,6 +837,7 @@ class Rice:
             ],
             self.timestep,
         )
+
         self.set_global_state(
             "mitigation_rate_all_regions",
             [
