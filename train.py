@@ -60,7 +60,7 @@ def train(run_config, save_dir):
     model_save_freq = run_config["saving"]["model_params_save_freq"]
     # Fetch the env object from the trainer
     # trainer.
-    episode_length = EnvWrapper(run_config["env"]).episode_length
+    episode_length = EnvWrapper(run_config["env"]).env.episode_length
     num_iters = (num_episodes * episode_length) // train_batch_size
 
     for iteration in range(num_iters):
