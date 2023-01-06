@@ -42,7 +42,7 @@ bower_components
 .vscode/*
 !.vscode/settings.json
 !.vscode/tasks.json
-!.vscode/launch.json
+# !.vscode/launch.json
 !.vscode/extensions.json
 
 # misc
@@ -238,5 +238,8 @@ core
 wandb/
 
 #submissions as state dicts can be quite large
-Submissions/
+submissions/
 
+#ignore old scripts and results directory
+redundant
+experiments

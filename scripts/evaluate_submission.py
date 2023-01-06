@@ -19,6 +19,7 @@ import time
 from collections import OrderedDict
 
 import numpy as np
+import wandb
 import yaml
 
 from pathlib import Path
@@ -52,6 +53,8 @@ _METRICS_TO_LABEL_DICT["production_all_regions"] = ("Production", 0)
 _METRICS_TO_LABEL_DICT["gross_output_all_regions"] = ("Gross Output", 0)
 _METRICS_TO_LABEL_DICT["investment_all_regions"] = ("Investment", 0)
 _METRICS_TO_LABEL_DICT["abatement_cost_all_regions"] = ("Abatement Cost", 2)
+_METRICS_TO_LABEL_DICT["mitigation_rate_all_regions"] = ("Mitigation Rate", 0)
+_METRICS_TO_LABEL_DICT["consumption_all_regions"] = ("Consumption", 0)
 
 
 def get_imports(framework=None):
@@ -175,6 +178,17 @@ def compute_metrics(fetch_episode_states, trainer, framework, num_episodes=1):
         framework in available_frameworks
     ), f"Invalid framework {framework}, should be in f{available_frameworks}."
 
+
+    config_fp = Path("scripts") / "rice_rllib.yaml"
+    with open(config_fp, "r", encoding="utf8") as fp:
+        env_config = yaml.safe_load(fp)["env"]
+
+    if env_config["logging"]:
+        wandb.login(key=env_config["wandb_config"]["login"])
+        wandb.init(project=env_config["wandb_config"]["project"],
+            name=f'{env_config["wandb_config"]["run"]}_{time.strftime("%Y-%m-%d_%H%M%S")}',
+            entity=env_config["wandb_config"]["entity"])
+
     # Fetch all the desired outputs to compute various metrics.
     desired_outputs = list(_METRICS_TO_LABEL_DICT.keys())
 
@@ -224,6 +238,15 @@ def compute_metrics(fetch_episode_states, trainer, framework, num_episodes=1):
                 mean_feature_value, metrics_to_label_dict[1]
             )
 
+
+            if env_config["logging"]:
+                wandb.log({feature : wandb.plot.line_series(
+                       xs=list(range(episode_states[episode_id][feature].shape[0])),
+                       ys=episode_states[episode_id][feature].T.tolist(),
+                       keys=[f"region_{x}" for x in range(episode_states[episode_id][feature].shape[1])],
+                       title=metrics_to_label_dict[0],
+                       xname="Steps")})
+
         success = True
         comment = "Successful submission"
     except Exception as err:
@@ -231,6 +254,9 @@ def compute_metrics(fetch_episode_states, trainer, framework, num_episodes=1):
         success = False
         comment = "Could not obtain an episode rollout!"
         eval_metrics = {}
+
+    if env_config["logging"]:
+        wandb.finish()
 
     return success, comment, eval_metrics
 

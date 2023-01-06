@@ -15,14 +15,14 @@ import os
 import shutil
 import subprocess
 import sys
+
 import numpy as np
 import yaml
 from desired_outputs import desired_outputs
-from opt_helper import get_mean_std
 from fixed_paths import PUBLIC_REPO_DIR
 
 sys.path.append(PUBLIC_REPO_DIR)
-
+from opt_helper import get_mean_std
 from scripts.run_unittests import import_class_from_path
 
 # Set logger level e.g., DEBUG, INFO, WARNING, ERROR.
