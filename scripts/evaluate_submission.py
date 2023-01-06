@@ -199,7 +199,7 @@ def validate_dir(results_dir=None):
     return framework, success, comment
 
 
-def compute_metrics(fetch_episode_states, trainer, framework, num_episodes=1):
+def compute_metrics(fetch_episode_states, trainer, framework, env_config, num_episodes=1):
     """
     Generate episode rollouts and compute metrics.
     """
@@ -208,11 +208,6 @@ def compute_metrics(fetch_episode_states, trainer, framework, num_episodes=1):
     assert (
         framework in available_frameworks
     ), f"Invalid framework {framework}, should be in f{available_frameworks}."
-
-
-    config_fp = Path("scripts") / "rice_rllib.yaml"
-    with open(config_fp, "r", encoding="utf8") as fp:
-        env_config = yaml.safe_load(fp)["env"]
 
     if env_config["logging"]:
         wandb.login(key=env_config["wandb_config"]["login"])
@@ -439,6 +434,7 @@ def perform_evaluation(
                                     fetch_episode_states,
                                     trainer,
                                     framework,
+                                    run_config["env"],
                                     num_episodes=num_episodes,
                                 )
 
