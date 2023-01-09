@@ -23,13 +23,15 @@ import importlib
 from negotiator import (
     BilateralNegotiatorWithOnlyTariff,
     BilateralNegotiatorWithTariff,
-    BilateralNegotiator
+    BilateralNegotiator,
+    BasicClub
 )
 
 NEGOTIATION_PROTOCOLS = {
     "BilateralNegotiatorWithOnlyTariff": BilateralNegotiatorWithOnlyTariff,
     "BilateralNegotiatorWithTariff": BilateralNegotiatorWithOnlyTariff,
-    "BilateralNegotiator":BilateralNegotiator
+    "BilateralNegotiator":BilateralNegotiator,
+    "BasicClub":BasicClub
 }
 
 
@@ -175,7 +177,7 @@ class Rice:
         )
 
         #enable logging
-        self.logging = logging
+        self.logging = False
         self.wandb_config = wandb_config
 
         # Negotiation-related initializations
@@ -379,6 +381,13 @@ class Rice:
                 timestep=self.timestep,
             )
 
+        try:
+            self.negotiator.reset()
+        except Exception as e:
+            print("reset failed")
+            print(str(e))
+            pass
+
         return self.generate_observation()
 
     def step(self, actions=None):
@@ -557,7 +566,7 @@ class Rice:
 
         # Negotiation-specific features
         if self.negotiation_on:
-            global_features += ["stage"]
+            global_features += ["stage", "proposed_mitigation_rate"]
 
             public_features += []
 
@@ -836,6 +845,7 @@ class Rice:
             ],
             self.timestep,
         )
+
         self.set_global_state(
             "max_export_limit_all_regions",
             [
