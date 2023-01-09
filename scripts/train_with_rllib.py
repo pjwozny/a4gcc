@@ -36,7 +36,11 @@ def perform_other_imports():
     import ray
     import torch
     from gym.spaces import Box, Dict
-    from ray.rllib.agents.a3c import A2CTrainer
+    if ray.__version__ == "1.0.0":
+        from ray.rllib.agents.a3c import A2CTrainer
+    else:
+        from ray.rllib.algorithms.a2c import A2C as A2CTrainer
+    # from ray.rllib.agents.a3c import A2CTrainer
     from ray.rllib.env.multi_agent_env import MultiAgentEnv
     from ray.tune.logger import NoopLogger
 
@@ -369,7 +373,7 @@ def fetch_episode_states(trainer_obj=None, episode_states=None):
                     agent_states[region_id],
                     policy_id=policy_ids[region_id],
                 )
-        _, _, done, _ = env_object.step(actions)
+        obs, _, done, _ = env_object.step(actions)
         if done["__all__"]:
             for state in episode_states:
                 outputs[state][timestep + 1] = env.global_state[state]["value"][

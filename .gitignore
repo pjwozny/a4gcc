@@ -200,7 +200,7 @@ celerybeat.pid
 
 # Environments
 .env
-.venv
+.venv*
 env/
 venv/
 ENV/
@@ -231,6 +231,7 @@ Draw_graphs.ipynb
 100_rounds.pkl
 *.pdf
 *.txt
+!requirements_eval.txt
 core
 .tmp
 
@@ -243,3 +244,4 @@ submissions/
 #ignore old scripts and results directory
 redundant
 experiments
+output
