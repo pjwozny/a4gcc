@@ -24,6 +24,8 @@ from negotiator import (
     BilateralNegotiatorWithOnlyTariff,
     BilateralNegotiatorWithTariff,
     BilateralNegotiator,
+    BasicClubDiscreteDefect,
+    BasicClubDiscreteDefectClusterProposals,
     BasicClub
 )
 
@@ -31,7 +33,9 @@ NEGOTIATION_PROTOCOLS = {
     "BilateralNegotiatorWithOnlyTariff": BilateralNegotiatorWithOnlyTariff,
     "BilateralNegotiatorWithTariff": BilateralNegotiatorWithOnlyTariff,
     "BilateralNegotiator":BilateralNegotiator,
-    "BasicClub":BasicClub
+    "BasicClub":BasicClub,
+    "BasicClubDiscreteDefect":BasicClubDiscreteDefect,
+    "BasicClubDiscreteDefectClusterProposals":BasicClubDiscreteDefectClusterProposals
 }
 
 
@@ -186,7 +190,7 @@ class Rice:
 
             self.negotiator = negotiator_cls(self)
 
-            self.num_negotiation_stages = 2  # proposal and evaluation steps
+            self.num_negotiation_stages = len(self.negotiator.stages)  # proposal and evaluation steps
             self.episode_length += (
                 self.dice_constant["xN"] * self.negotiator.num_negotiation_stages
             )
@@ -199,9 +203,10 @@ class Rice:
             # either accept or reject.
             self.evaluation_actions_nvec = self.negotiator.stages[1]["numberActions"]
 
-            self.actions_nvec += (
-                self.proposal_actions_nvec + self.evaluation_actions_nvec
-            )
+            for action in self.negotiator.stages:
+                self.actions_nvec += action["numberActions"]
+
+
 
         # Set the env action space
         self.action_space = {
@@ -421,6 +426,7 @@ class Rice:
                 "stage", self.stage, self.timestep, dtype=self.int_dtype
             )
             if self.stage != 0:
+
                 return self.negotiator.stages[self.stage-1]["function"](actions)
 
         return self.climate_and_economy_simulation_step(actions)
