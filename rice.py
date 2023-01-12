@@ -11,9 +11,6 @@ Regional Integrated model of Climate and the Economy (RICE)
 import logging
 import os
 import sys
-from datetime import datetime
-import re
-from random import randint
 import numpy as np
 from gym.spaces import MultiDiscrete
 
