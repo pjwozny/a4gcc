@@ -220,12 +220,13 @@ def get_rllib_config(exp_run_config=None, env_class=None, seed=None):
         # Arguments dict passed to the env creator as an EnvContext object (which
         # is a dict plus the properties: num_workers, worker_index, vector_index,
         # and remote).
+        "batch_mode": train_config["batch_mode"],
         "env_config": exp_run_config["env"],
         "framework": train_config["framework"],
         "multiagent": multiagent_config,
         "num_workers": train_config["num_workers"],
         "num_gpus": train_config["num_gpus"],
-        "num_envs_per_worker": train_config["num_envs"] // train_config["num_workers"],
+        "num_envs_per_worker": train_config["num_envs_per_worker"],
         "train_batch_size": train_config["train_batch_size"],
     }
     if seed is not None:
