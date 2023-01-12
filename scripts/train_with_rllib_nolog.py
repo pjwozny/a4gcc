@@ -358,7 +358,7 @@ def fetch_episode_states(trainer_obj=None, episode_states=None):
             if (
                 len(agent_states[region_id]) == 0
             ):  # stateless, with a linear model, for example
-                actions[region_id] = trainer_obj.compute_action(
+                actions[region_id] = trainer_obj.compute_single_action(
                     obs[region_id],
                     agent_states[region_id],
                     policy_id=policy_ids[region_id],
@@ -368,7 +368,7 @@ def fetch_episode_states(trainer_obj=None, episode_states=None):
                     actions[region_id],
                     agent_states[region_id],
                     _,
-                ) = trainer_obj.compute_action(
+                ) = trainer_obj.compute_single_action(
                     obs[region_id],
                     agent_states[region_id],
                     policy_id=policy_ids[region_id],
