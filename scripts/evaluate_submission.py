@@ -87,7 +87,6 @@ _METRICS_TO_LABEL_DICT["production_all_regions"] = ("Production", 2)
 
 # _METRICS_TO_LABEL_DICT["reward_all_regions"] = ("Episode Reward", 2)
 
-
 def get_imports(framework=None):
     """
     Fetch relevant imports.
@@ -119,24 +118,14 @@ def get_results_dir():
         "--results_dir",
         "-r",
         type=str,
-        default=".",
         help="the directory where all the submission files are saved. Can also be "
         "the zipped file containing all the submission files.",
+        required=True,
     )
     args = parser.parse_args()
+    results_dir = args.results_dir
 
-    if "results_dir" not in args:
-        raise ValueError(
-            "Please provide a results directory to evaluate with the argument -r"
-        )
-    if not os.path.exists(args.results_dir):
-        raise ValueError(
-            "The results directory is missing. Please make sure the correct path "
-            "is specified!"
-        )
     try:
-        results_dir = args.results_dir
-
         # Also handle a zipped file
         if results_dir.endswith(".zip"):
             unzipped_results_dir = os.path.join("/tmp", str(time.time()))
@@ -279,6 +268,10 @@ def compute_metrics(fetch_episode_states, trainer, framework, env_config, num_ep
                        title=feature,
                        xname="Steps")})
 
+                if feature.endswidth("_all_regions"):
+                    #TODO: log averages of all regions features
+                    title = f"average_{feature.rsplit('_', 2)[0]}_over_regions"
+
         success = True
         comment = "Successful submission"
     except Exception as err:
@@ -293,66 +286,66 @@ def compute_metrics(fetch_episode_states, trainer, framework, env_config, num_ep
     return success, comment, eval_metrics
 
 
-def val_metrics(trainer, logged_ts, framework, num_episodes=1):
-    """
-    Generate episode rollouts and compute metrics.
-    """
-    assert trainer is not None
-    available_frameworks = ["rllib", "warpdrive"]
-    assert (
-        framework in available_frameworks
-    ), f"Invalid framework {framework}, should be in f{available_frameworks}."
+# def val_metrics(trainer, logged_ts, framework, num_episodes=1):
+#     """
+#     Generate episode rollouts and compute metrics.
+#     """
+#     assert trainer is not None
+#     available_frameworks = ["rllib", "warpdrive"]
+#     assert (
+#         framework in available_frameworks
+#     ), f"Invalid framework {framework}, should be in f{available_frameworks}."
 
-    # Fetch all the desired outputs to compute various metrics.
-    desired_outputs = list(_METRICS_TO_LABEL_DICT.keys())
-    episode_states = {}
-    eval_metrics = {}
-    try:
-        for episode_id in range(num_episodes):
-            episode_states[episode_id] = logged_ts
+#     # Fetch all the desired outputs to compute various metrics.
+#     desired_outputs = list(_METRICS_TO_LABEL_DICT.keys())
+#     episode_states = {}
+#     eval_metrics = {}
+#     try:
+#         for episode_id in range(num_episodes):
+#             episode_states[episode_id] = logged_ts
             
-        for feature in desired_outputs:
-            feature_values = [None for _ in range(num_episodes)]
+#         for feature in desired_outputs:
+#             feature_values = [None for _ in range(num_episodes)]
 
-            if feature == "global_temperature":
-                # Get the temp rise for upper strata
-                for episode_id in range(num_episodes):
-                    feature_values[episode_id] = (
-                        episode_states[episode_id][feature][-1, 0]
-                        - episode_states[episode_id][feature][0, 0]
-                    )
+#             if feature == "global_temperature":
+#                 # Get the temp rise for upper strata
+#                 for episode_id in range(num_episodes):
+#                     feature_values[episode_id] = (
+#                         episode_states[episode_id][feature][-1, 0]
+#                         - episode_states[episode_id][feature][0, 0]
+#                     )
 
-            elif feature == "global_carbon_mass":
-                for episode_id in range(num_episodes):
-                    feature_values[episode_id] = episode_states[episode_id][feature][
-                        -1, 0
-                    ]
+#             elif feature == "global_carbon_mass":
+#                 for episode_id in range(num_episodes):
+#                     feature_values[episode_id] = episode_states[episode_id][feature][
+#                         -1, 0
+#                     ]
 
-            else:
-                for episode_id in range(num_episodes):
-                    feature_values[episode_id] = np.sum(
-                        episode_states[episode_id][feature]
-                    )
+#             else:
+#                 for episode_id in range(num_episodes):
+#                     feature_values[episode_id] = np.sum(
+#                         episode_states[episode_id][feature]
+#                     )
 
-            # Compute mean feature value across episodes
-            mean_feature_value = np.mean(feature_values)
+#             # Compute mean feature value across episodes
+#             mean_feature_value = np.mean(feature_values)
 
-            # Formatting the values
-            metrics_to_label_dict = _METRICS_TO_LABEL_DICT[feature]
+#             # Formatting the values
+#             metrics_to_label_dict = _METRICS_TO_LABEL_DICT[feature]
 
-            eval_metrics[metrics_to_label_dict[0]] = perform_format(
-                mean_feature_value, metrics_to_label_dict[1]
-            )
+#             eval_metrics[metrics_to_label_dict[0]] = perform_format(
+#                 mean_feature_value, metrics_to_label_dict[1]
+#             )
 
-        success = True
-        comment = "Successful submission"
-    except Exception as err:
-        logging.error(err)
-        success = False
-        comment = "Could not obtain an episode rollout!"
-        eval_metrics = {}
+#         success = True
+#         comment = "Successful submission"
+#     except Exception as err:
+#         logging.error(err)
+#         success = False
+#         comment = "Could not obtain an episode rollout!"
+#         eval_metrics = {}
 
-    return success, comment, eval_metrics
+#     return success, comment, eval_metrics
 
 
 def perform_format(val, num_decimal_places):
