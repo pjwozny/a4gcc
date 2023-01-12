@@ -418,6 +418,11 @@ def perform_evaluation(
                     with open(config_file, "r", encoding="utf-8") as file_ptr:
                         run_config = yaml.safe_load(file_ptr)
 
+                    #TODO: create better method of setting workers for eval
+                    run_config["trainer"]["num_envs"] = 1
+                    run_config["trainer"]["num_workers"] = 1
+                    run_config["trainer"]["num_gpus"] = 0
+
                     # Create trainer object
                     try:
                         trainer, _ = create_trainer(

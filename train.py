@@ -194,7 +194,7 @@ def load_model_checkpoints(trainer_obj=None, save_directory=None, ckpt_idx=-1):
     trainer_obj.set_weights(model_params)
 
 
-def create_trainer(run_config, seed=None) -> Algorithm:
+def create_trainer(run_config, seed=None):
     """
     Create the RLlib trainer.
     """
@@ -228,8 +228,8 @@ if __name__ == "__main__":
     save_dir.mkdir(parents=True)
 
     # Initialize wandb
-    if run_config["env"]["logging"]:
-        wandb_config = run_config["env"]["wandb_config"]
+    if run_config["logging"]["enabled"]:
+        wandb_config = run_config["logging"]["wandb_config"]
         wandb.login(key=wandb_config["login"])
         wandb.init(project=wandb_config["project"],
             name=f'{wandb_config["run"]}_{time.strftime("%Y-%m-%d_%H%M%S")}',
