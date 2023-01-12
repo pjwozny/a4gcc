@@ -26,7 +26,8 @@ from negotiator import (
     BilateralNegotiator,
     BasicClubDiscreteDefect,
     BasicClubDiscreteDefectClusterProposals,
-    BasicClub
+    BasicClub,
+    BasicClubClusterProposals
 )
 
 NEGOTIATION_PROTOCOLS = {
@@ -35,7 +36,8 @@ NEGOTIATION_PROTOCOLS = {
     "BilateralNegotiator":BilateralNegotiator,
     "BasicClub":BasicClub,
     "BasicClubDiscreteDefect":BasicClubDiscreteDefect,
-    "BasicClubDiscreteDefectClusterProposals":BasicClubDiscreteDefectClusterProposals
+    "BasicClubDiscreteDefectClusterProposals":BasicClubDiscreteDefectClusterProposals,
+    "BasicClubClusterProposals":BasicClubClusterProposals
 }
 
 
