@@ -75,7 +75,7 @@ def train(run_config, save_dir):
 
     # Create a (zipped) submission file
     # ---------------------------------
-    prepare_submission(save_dir)
+    # prepare_submission(save_dir)
 
     # Close Ray gracefully after completion
     ray.shutdown()
@@ -226,14 +226,6 @@ if __name__ == "__main__":
     # Create the save directory
     save_dir = Path("experiments") / time.strftime("%Y-%m-%d_%H%M%S")
     save_dir.mkdir(parents=True)
-
-    # Initialize wandb
-    if run_config["logging"]["enabled"]:
-        wandb_config = run_config["logging"]["wandb_config"]
-        wandb.login(key=wandb_config["login"])
-        wandb.init(project=wandb_config["project"],
-            name=f'{wandb_config["run"]}_{time.strftime("%Y-%m-%d_%H%M%S")}',
-            entity=wandb_config["entity"])
 
     # Write timestamp of start training
     with open(save_dir / "timestamp.txt", "a") as f:
