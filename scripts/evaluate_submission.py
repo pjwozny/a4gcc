@@ -188,7 +188,37 @@ def validate_dir(results_dir=None):
     return framework, success, comment
 
 
-def compute_metrics(fetch_episode_states, trainer, framework, env_config, num_episodes=1):
+def prepare_submission(results_dir: Path):
+    """
+    # Validate all the submission files and compress into a .zip.
+    Note: This method is also invoked in the trainer script itself!
+    So if you ran the training script, you may not need to re-run this.
+    Args results_dir: the directory where all the training files were saved.
+    """
+    assert isinstance(results_dir, Path)
+
+    # Validate the results directory
+    # validate_dir(results_dir)
+
+    # Make a temporary copy of the results directory for zipping
+    results_dir_copy = results_dir.parent / "tmp_copy"
+    shutil.copytree(results_dir, results_dir_copy)
+
+    # Remove all the checkpoint state files from the tmp directory except for the last one
+    policy_models = list(results_dir_copy.glob("*.state_dict"))
+    policy_models = sorted(policy_models, key=lambda x: x.stat().st_mtime)
+    _ = [policy_model.unlink() for policy_model in policy_models[:-1]]
+
+    # Create the submission file and delete the temporary copy
+    submission_file = Path("submissions") / results_dir.name
+    shutil.make_archive(submission_file, "zip", results_dir_copy)
+    print("NOTE: The submission file is created at:", submission_file.with_suffix(".zip"))
+    shutil.rmtree(results_dir_copy)
+
+    return submission_file.with_suffix(".zip")
+
+
+def compute_metrics(fetch_episode_states, trainer, framework, submission_file, env_config, logging_config=None, num_episodes=1):
     """
     Generate episode rollouts and compute metrics.
     """
@@ -198,11 +228,11 @@ def compute_metrics(fetch_episode_states, trainer, framework, env_config, num_ep
         framework in available_frameworks
     ), f"Invalid framework {framework}, should be in f{available_frameworks}."
 
-    if env_config["logging"]:
-        wandb.login(key=env_config["wandb_config"]["login"])
-        wandb.init(project=env_config["wandb_config"]["project"],
-            name=f'{env_config["wandb_config"]["run"]}_{time.strftime("%Y-%m-%d_%H%M%S")}',
-            entity=env_config["wandb_config"]["entity"])
+    if logging_config:
+        wandb.login(key=logging_config["wandb_config"]["login"])
+        wandb.init(project=logging_config["wandb_config"]["project"],
+            name=f'{logging_config["wandb_config"]["run"]}_{time.strftime("%Y-%m-%d_%H%M%S")}',
+            entity=logging_config["wandb_config"]["entity"])
 
     # Fetch all the desired outputs to compute various metrics.
     desired_outputs = list(_METRICS_TO_LABEL_DICT.keys())
@@ -254,7 +284,7 @@ def compute_metrics(fetch_episode_states, trainer, framework, env_config, num_ep
             )
 
 
-            if env_config["logging"]:
+            if logging_config:
                 if env_config["negotiation_on"]:
                     ys = episode_states[episode_id][feature][0::3].T.tolist()
                 else:
@@ -268,7 +298,7 @@ def compute_metrics(fetch_episode_states, trainer, framework, env_config, num_ep
                        title=feature,
                        xname="Steps")})
 
-                if feature.endswidth("_all_regions"):
+                if feature.endswith("_all_regions"):
                     #TODO: log averages of all regions features
                     title = f"average_{feature.rsplit('_', 2)[0]}_over_regions"
 
@@ -280,7 +310,11 @@ def compute_metrics(fetch_episode_states, trainer, framework, env_config, num_ep
         comment = "Could not obtain an episode rollout!"
         eval_metrics = {}
 
-    if env_config["logging"]:
+    if logging_config:
+        # attach submission file as artifact (needs to be named after the nego class)
+        artifact = wandb.Artifact("submission", type="model")
+        artifact.add_file(submission_file)
+        wandb.log_artifact(artifact)
         wandb.finish()
 
     return success, comment, eval_metrics
@@ -374,6 +408,8 @@ def perform_evaluation(
     assert num_episodes > 0
 
     framework, success, comment = validate_dir(results_directory)
+    submission_file = prepare_submission(Path(results_directory))
+
     if success:
         logging.info("Running unit tests...")
         this_file_dir = os.path.dirname(os.path.abspath(__file__))
@@ -432,7 +468,9 @@ def perform_evaluation(
                                     fetch_episode_states,
                                     trainer,
                                     framework,
+                                    submission_file,
                                     run_config["env"],
+                                    run_config["logging"],
                                     num_episodes=num_episodes,
                                 )
 
