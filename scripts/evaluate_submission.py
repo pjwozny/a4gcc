@@ -285,15 +285,15 @@ def compute_metrics(fetch_episode_states, trainer, framework, submission_file, e
 
 
             if logging_config:
-                if env_config["negotiation_on"]:
-                    ys = episode_states[episode_id][feature][0::3].T.tolist()
-                else:
-                    ys = episode_states[episode_id][feature].T.tolist()
+                #TODO: fix dirty method to remove negotiation steps from results
+                interval = (len(episode_states[episode_id][feature]) - 1) // 20
+                ys = episode_states[episode_id][feature][0::interval].T
+                
 
                 xs = list(range(len(ys[0])))
                 wandb.log({feature : wandb.plot.line_series(
                        xs=xs,
-                       ys=ys,
+                       ys=ys.tolist(),
                        keys=[f"region_{x}" for x in range(len(ys))],
                        title=feature,
                        xname="Steps")})
