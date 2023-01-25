@@ -205,14 +205,18 @@ def load_model_checkpoints(trainer_obj=None, save_directory=None, ckpt_idx=-1):
         "Invalid folder path. "
         "Please specify a valid directory to load the checkpoints from."
     )
-    files = [f for f in os.listdir(save_directory) if f.endswith("state_dict")]
+    
+    #TODO: Quick fix to solve multiple state_dict issue. Should be done properly.
+    # Old method assumed that multiple state_dicts indicate multiple policies in stead of checkpoints.
+    files = [sorted(glob.glob(f"{save_directory}/*.state_dict"))[0]]
+    # files = [f for f in os.listdir(save_directory) if f.endswith("state_dict")]
 
     assert len(files) == len(trainer_obj.config["multiagent"]["policies"])
 
     model_params = trainer_obj.get_weights()
     for policy in model_params:
         policy_models = [
-            os.path.join(save_directory, file) for file in files if policy in file
+            file for file in files if policy in file
         ]
         # If there are multiple files, then use the ckpt_idx to specify the checkpoint
         assert ckpt_idx < len(policy_models)
