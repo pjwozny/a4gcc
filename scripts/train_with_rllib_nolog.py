@@ -20,6 +20,7 @@ import time
 import numpy as np
 import yaml
 from run_unittests import import_class_from_path
+from train import get_rllib_config
 from desired_outputs import desired_outputs
 from fixed_paths import PUBLIC_REPO_DIR
 
@@ -171,67 +172,6 @@ class EnvWrapper(MultiAgentEnv):
         return recursive_list_to_np_array(obs), rew, done, info
 
 
-def get_rllib_config(exp_run_config=None, env_class=None, seed=None):
-    """
-    Reference: https://docs.ray.io/en/latest/rllib-training.html
-    """
-
-    assert exp_run_config is not None
-    assert env_class is not None
-
-    env_config = exp_run_config["env"]
-    assert isinstance(env_config, dict)
-    env_object = env_class(env_config=env_config)
-
-    # Define all the policies here
-    policy_config = exp_run_config["policy"]["regions"]
-
-    # Map of type MultiAgentPolicyConfigDict from policy ids to tuples
-    # of (policy_cls, obs_space, act_space, config). This defines the
-    # observation and action spaces of the policies and any extra config.
-    policies = {
-        "regions": (
-            None,  # uses default policy
-            env_object.observation_space[0],
-            env_object.action_space[0],
-            policy_config,
-        ),
-    }
-
-    # Function mapping agent ids to policy ids.
-    def policy_mapping_fn(agent_id=None):
-        assert agent_id is not None
-        return "regions"
-
-    # Optional list of policies to train, or None for all policies.
-    policies_to_train = None
-
-    # Settings for Multi-Agent Environments
-    multiagent_config = {
-        "policies": policies,
-        "policies_to_train": policies_to_train,
-        "policy_mapping_fn": policy_mapping_fn,
-    }
-
-    train_config = exp_run_config["trainer"]
-    rllib_config = {
-        # Arguments dict passed to the env creator as an EnvContext object (which
-        # is a dict plus the properties: num_workers, worker_index, vector_index,
-        # and remote).
-        "env_config": exp_run_config["env"],
-        "framework": train_config["framework"],
-        "multiagent": multiagent_config,
-        "num_workers": train_config["num_workers"],
-        "num_gpus": train_config["num_gpus"],
-        "num_envs_per_worker": train_config["num_envs"] // train_config["num_workers"],
-        "train_batch_size": train_config["train_batch_size"],
-    }
-    if seed is not None:
-        rllib_config["seed"] = seed
-
-    return rllib_config
-
-
 def save_model_checkpoint(trainer_obj=None, save_directory=None, current_timestep=0):
     """
     Save trained model checkpoints.
@@ -309,7 +249,7 @@ def create_trainer(exp_run_config=None, source_dir=None, results_dir=None, seed=
     rllib_trainer = A2CTrainer(
         env=EnvWrapper,
         config=get_rllib_config(
-            exp_run_config=exp_run_config, env_class=EnvWrapper, seed=seed
+            run_config=exp_run_config, env_class=EnvWrapper, seed=seed
         ),
     )
     return rllib_trainer, results_save_dir
