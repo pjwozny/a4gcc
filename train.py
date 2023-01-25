@@ -29,19 +29,22 @@ from scripts.fixed_paths import PUBLIC_REPO_DIR
 
 sys.path.append(PUBLIC_REPO_DIR)
 
-from scripts.create_submission_zip import prepare_submission
 from scripts.environment_wrapper import EnvWrapper
-from scripts.evaluate_submission import perform_evaluation
 from scripts.torch_models import TorchLinear
+from scripts.evaluate_submission import perform_evaluation
 
 ModelCatalog.register_custom_model("torch_linear", TorchLinear)
-
 
 
 def train(run_config, save_dir):
     # Copy relevant source files
     # ------------------------------------------------
-    copy_files = ["rice.py", "negotiator.py", "rice_helpers.py", "scripts/rice_rllib.yaml"]
+    copy_files = [
+        "rice.py",
+        "negotiator.py",
+        "rice_helpers.py",
+        "scripts/rice_rllib.yaml",
+    ]
     for file in copy_files:
         shutil.copy(file, save_dir)
     # shutil.copytree("scripts_submit", save_dir)
@@ -237,7 +240,7 @@ if __name__ == "__main__":
 
     with open(config_path, "r", encoding="utf8") as fp:
         run_config = yaml.safe_load(fp)
-    
+
     # Create the save directory
     save_dir = Path("experiments") / time.strftime("%Y-%m-%d_%H%M%S")
     save_dir.mkdir(parents=True)
