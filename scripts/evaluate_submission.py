@@ -299,8 +299,12 @@ def compute_metrics(fetch_episode_states, trainer, framework, submission_file, e
                        xname="Steps")})
 
                 if feature.endswith("_all_regions"):
-                    #TODO: log averages of all regions features
-                    title = f"average_{feature.rsplit('_', 2)[0]}_over_regions"
+                    title = f"mean_{feature.rsplit('_', 2)[0]}_over_regions"
+                    ys_mean = np.mean(ys, axis=1)
+                    data = [[x, y] for (x, y) in zip(xs, ys_mean.tolist())]
+                    table = wandb.Table(data=data, columns = ["Steps", "y"])
+                    wandb.log({title : wandb.plot.line(table, "Steps", "y",
+                            title=title)})
 
         success = True
         comment = "Successful submission"
