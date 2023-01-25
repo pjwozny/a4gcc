@@ -258,8 +258,8 @@ if __name__ == "__main__":
     with open(save_dir / "timestamp.txt", "a") as f:
         f.write(f"STOP:\t{time.strftime('%Y-%m-%d_%H:%M:%S')}\n")
 
-    # framework_used, succeeded, metrics, comments = perform_evaluation(save_dir)
-    # print(f"Framework used: {framework_used}")
-    # print(f"Succeeded: {succeeded}")
-    # print(f"Metrics: {metrics}")
-    # print(f"Comments: {comments}")
+    framework_used, succeeded, metrics, comments = perform_evaluation(save_dir)
+    print(f"Framework used: {framework_used}")
+    print(f"Succeeded: {succeeded}")
+    print(f"Metrics: {metrics}")
+    print(f"Comments: {comments}")
