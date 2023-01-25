@@ -56,7 +56,7 @@ def train(run_config, save_dir):
     # Perform training
     # ------------------------------------------------
     num_episodes = run_config["trainer"]["num_episodes"]
-    train_batch_size = run_config["trainer"]["train_batch_size"]
+    train_batch_size = trainer.config["train_batch_size"]
     model_save_freq = run_config["saving"]["model_params_save_freq"]
     # Fetch the env object from the trainer
     episode_length = EnvWrapper(run_config["env"]).env.episode_length
