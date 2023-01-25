@@ -59,7 +59,6 @@ def train(run_config, save_dir):
     train_batch_size = run_config["trainer"]["train_batch_size"]
     model_save_freq = run_config["saving"]["model_params_save_freq"]
     # Fetch the env object from the trainer
-    # trainer.
     episode_length = EnvWrapper(run_config["env"]).env.episode_length
     num_iters = (num_episodes * episode_length) // train_batch_size
 
@@ -67,11 +66,25 @@ def train(run_config, save_dir):
         print(f"********** Iter : {iteration + 1:5d} / {num_iters:5d} **********")
         result = trainer.train()
         print(f"episode_reward_mean: {result.get('episode_reward_mean')}")
+        wandb.log(
+            {
+                "episode_reward_min": result["episode_reward_min"],
+                "episode_reward_mean": result["episode_reward_mean"],
+                "episode_reward_max": result["episode_reward_max"],
+            },
+            step=result["episodes_total"],
+        )
+        wandb.log(
+            result["info"]["learner"]["regions"]["learner_stats"],
+            step=result["episodes_total"],
+        )
 
         if iteration % model_save_freq == 0 or iteration + 1 == num_iters:
             total_timesteps = result.get("timesteps_total")
             save_model_checkpoint(trainer, save_dir, total_timesteps)
             logging.info(result)
+
+    wandb.finish()
 
     # Create a (zipped) submission file
     # ---------------------------------
@@ -226,6 +239,16 @@ if __name__ == "__main__":
     # Create the save directory
     save_dir = Path("experiments") / time.strftime("%Y-%m-%d_%H%M%S")
     save_dir.mkdir(parents=True)
+
+    # Initialize wandb
+    if run_config["logging"]["enabled"]:
+        wandb_config = run_config["logging"]["wandb_config"]
+        wandb.login(key=wandb_config["login"])
+        wandb.init(
+            project=wandb_config["project"],
+            name=f'{wandb_config["run"]}',
+            entity=wandb_config["entity"],
+        )
 
     # Write timestamp of start training
     with open(save_dir / "timestamp.txt", "a") as f:
