@@ -232,7 +232,7 @@ def compute_metrics(fetch_episode_states, trainer, framework, submission_file, e
         wandb_config = logging_config["wandb_config"]
         wandb.login(key=wandb_config["login"])
         wandb.init(project=wandb_config["project"],
-            name=f'{wandb_config["run"]}_eval_{time.strftime("%Y-%m-%d_%H%M%S")}',
+            name=f'{wandb_config["run"]}',
             entity=wandb_config["entity"])
 
     # Fetch all the desired outputs to compute various metrics.
@@ -289,7 +289,7 @@ def compute_metrics(fetch_episode_states, trainer, framework, submission_file, e
                 #TODO: fix dirty method to remove negotiation steps from results
                 interval = (len(episode_states[episode_id][feature]) - 1) // 20
                 ys = episode_states[episode_id][feature][0::interval].T
-                
+
 
                 xs = list(range(len(ys[0])))
                 wandb.log({feature : wandb.plot.line_series(
