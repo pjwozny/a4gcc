@@ -136,6 +136,7 @@ def get_rllib_config(run_config=None, env_class=None, seed=None):
         "policy_mapping_fn": policy_mapping_fn,
     }
 
+    episode_length = EnvWrapper(run_config["env"]).env.episode_length
     train_config = run_config["trainer"]
     rllib_config = {
         # Arguments dict passed to the env creator as an EnvContext object (which
@@ -148,7 +149,8 @@ def get_rllib_config(run_config=None, env_class=None, seed=None):
         "num_workers": train_config["num_workers"],
         "num_gpus": train_config["num_gpus"],
         "num_envs_per_worker": train_config["num_envs_per_worker"],
-        "train_batch_size": train_config["train_batch_size"],
+        "train_batch_size": train_config["train_batch_size_in_episodes"]
+        * episode_length,
     }
     if seed is not None:
         rllib_config["seed"] = seed
