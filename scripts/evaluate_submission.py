@@ -229,10 +229,11 @@ def compute_metrics(fetch_episode_states, trainer, framework, submission_file, e
     ), f"Invalid framework {framework}, should be in f{available_frameworks}."
 
     if logging_config:
-        wandb.login(key=logging_config["wandb_config"]["login"])
-        wandb.init(project=logging_config["wandb_config"]["project"],
-            name=f'{logging_config["wandb_config"]["run"]}_{time.strftime("%Y-%m-%d_%H%M%S")}',
-            entity=logging_config["wandb_config"]["entity"])
+        wandb_config = logging_config["wandb_config"]
+        wandb.login(key=wandb_config["login"])
+        wandb.init(project=wandb_config["project"],
+            name=f'{wandb_config["run"]}_eval_{time.strftime("%Y-%m-%d_%H%M%S")}',
+            entity=wandb_config["entity"])
 
     # Fetch all the desired outputs to compute various metrics.
     desired_outputs = list(_METRICS_TO_LABEL_DICT.keys())
