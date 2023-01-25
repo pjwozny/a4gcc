@@ -194,7 +194,7 @@ def load_model_checkpoints(trainer_obj=None, save_directory=None, ckpt_idx=-1):
     trainer_obj.set_weights(model_params)
 
 
-def create_trainer(run_config, seed=None):
+def create_trainer(run_config, seed=None) -> Algorithm:
     """
     Create the RLlib trainer.
     """
