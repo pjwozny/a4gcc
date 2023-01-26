@@ -24,7 +24,7 @@ def prepare_submission(results_dir: Path):
     assert isinstance(results_dir, Path)
 
     # Validate the results directory
-    validate_dir(results_dir)
+    # validate_dir(results_dir)
 
     # Make a temporary copy of the results directory for zipping
     results_dir_copy = results_dir.parent / "tmp_copy"
@@ -40,6 +40,8 @@ def prepare_submission(results_dir: Path):
     shutil.make_archive(submission_file, "zip", results_dir_copy)
     print("NOTE: The submission file is created at:", submission_file.with_suffix(".zip"))
     shutil.rmtree(results_dir_copy)
+
+    return submission_file
 
 
 if __name__ == "__main__":

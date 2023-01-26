@@ -10,6 +10,7 @@ Training script for the rice environment using RLlib
 https://docs.ray.io/en/latest/rllib-training.html
 """
 
+import glob
 import logging
 import os
 import shutil
@@ -20,6 +21,7 @@ import time
 import numpy as np
 import yaml
 from run_unittests import import_class_from_path
+from train import get_rllib_config
 from desired_outputs import desired_outputs
 from fixed_paths import PUBLIC_REPO_DIR
 
@@ -173,67 +175,6 @@ class EnvWrapper(MultiAgentEnv):
         return recursive_list_to_np_array(obs), rew, done, info
 
 
-def get_rllib_config(exp_run_config=None, env_class=None, seed=None):
-    """
-    Reference: https://docs.ray.io/en/latest/rllib-training.html
-    """
-
-    assert exp_run_config is not None
-    assert env_class is not None
-
-    env_config = exp_run_config["env"]
-    assert isinstance(env_config, dict)
-    env_object = env_class(env_config=env_config)
-
-    # Define all the policies here
-    policy_config = exp_run_config["policy"]["regions"]
-
-    # Map of type MultiAgentPolicyConfigDict from policy ids to tuples
-    # of (policy_cls, obs_space, act_space, config). This defines the
-    # observation and action spaces of the policies and any extra config.
-    policies = {
-        "regions": (
-            None,  # uses default policy
-            env_object.observation_space[0],
-            env_object.action_space[0],
-            policy_config,
-        ),
-    }
-
-    # Function mapping agent ids to policy ids.
-    def policy_mapping_fn(agent_id=None):
-        assert agent_id is not None
-        return "regions"
-
-    # Optional list of policies to train, or None for all policies.
-    policies_to_train = None
-
-    # Settings for Multi-Agent Environments
-    multiagent_config = {
-        "policies": policies,
-        "policies_to_train": policies_to_train,
-        "policy_mapping_fn": policy_mapping_fn,
-    }
-
-    train_config = exp_run_config["trainer"]
-    rllib_config = {
-        # Arguments dict passed to the env creator as an EnvContext object (which
-        # is a dict plus the properties: num_workers, worker_index, vector_index,
-        # and remote).
-        "env_config": exp_run_config["env"],
-        "framework": train_config["framework"],
-        "multiagent": multiagent_config,
-        "num_workers": train_config["num_workers"],
-        "num_gpus": train_config["num_gpus"],
-        "num_envs_per_worker": train_config["num_envs"] // train_config["num_workers"],
-        "train_batch_size": train_config["train_batch_size"],
-    }
-    if seed is not None:
-        rllib_config["seed"] = seed
-
-    return rllib_config
-
-
 def save_model_checkpoint(trainer_obj=None, save_directory=None, current_timestep=0):
     """
     Save trained model checkpoints.
@@ -264,14 +205,18 @@ def load_model_checkpoints(trainer_obj=None, save_directory=None, ckpt_idx=-1):
         "Invalid folder path. "
         "Please specify a valid directory to load the checkpoints from."
     )
-    files = [f for f in os.listdir(save_directory) if f.endswith("state_dict")]
+    
+    #TODO: Quick fix to solve multiple state_dict issue. Should be done properly.
+    # Old method assumed that multiple state_dicts indicate multiple policies in stead of checkpoints.
+    files = [sorted(glob.glob(f"{save_directory}/*.state_dict"))[0]]
+    # files = [f for f in os.listdir(save_directory) if f.endswith("state_dict")]
 
     assert len(files) == len(trainer_obj.config["multiagent"]["policies"])
 
     model_params = trainer_obj.get_weights()
     for policy in model_params:
         policy_models = [
-            os.path.join(save_directory, file) for file in files if policy in file
+            file for file in files if policy in file
         ]
         # If there are multiple files, then use the ckpt_idx to specify the checkpoint
         assert ckpt_idx < len(policy_models)
@@ -309,7 +254,7 @@ def create_trainer(exp_run_config=None, source_dir=None, results_dir=None, seed=
     rllib_trainer = A2CTrainer(
         env=EnvWrapper,
         config=get_rllib_config(
-            exp_run_config=exp_run_config, env_class=EnvWrapper, seed=seed
+            run_config=exp_run_config, env_class=EnvWrapper, seed=seed
         ),
     )
     return rllib_trainer, results_save_dir
@@ -358,7 +303,7 @@ def fetch_episode_states(trainer_obj=None, episode_states=None):
             if (
                 len(agent_states[region_id]) == 0
             ):  # stateless, with a linear model, for example
-                actions[region_id] = trainer_obj.compute_action(
+                actions[region_id] = trainer_obj.compute_single_action(
                     obs[region_id],
                     agent_states[region_id],
                     policy_id=policy_ids[region_id],
@@ -368,7 +313,7 @@ def fetch_episode_states(trainer_obj=None, episode_states=None):
                     actions[region_id],
                     agent_states[region_id],
                     _,
-                ) = trainer_obj.compute_action(
+                ) = trainer_obj.compute_single_action(
                     obs[region_id],
                     agent_states[region_id],
                     policy_id=policy_ids[region_id],

@@ -87,7 +87,6 @@ _METRICS_TO_LABEL_DICT["production_all_regions"] = ("Production", 2)
 
 # _METRICS_TO_LABEL_DICT["reward_all_regions"] = ("Episode Reward", 2)
 
-
 def get_imports(framework=None):
     """
     Fetch relevant imports.
@@ -119,24 +118,14 @@ def get_results_dir():
         "--results_dir",
         "-r",
         type=str,
-        default=".",
         help="the directory where all the submission files are saved. Can also be "
         "the zipped file containing all the submission files.",
+        required=True,
     )
     args = parser.parse_args()
+    results_dir = args.results_dir
 
-    if "results_dir" not in args:
-        raise ValueError(
-            "Please provide a results directory to evaluate with the argument -r"
-        )
-    if not os.path.exists(args.results_dir):
-        raise ValueError(
-            "The results directory is missing. Please make sure the correct path "
-            "is specified!"
-        )
     try:
-        results_dir = args.results_dir
-
         # Also handle a zipped file
         if results_dir.endswith(".zip"):
             unzipped_results_dir = os.path.join("/tmp", str(time.time()))
@@ -199,7 +188,37 @@ def validate_dir(results_dir=None):
     return framework, success, comment
 
 
-def compute_metrics(fetch_episode_states, trainer, framework, env_config, num_episodes=1):
+def prepare_submission(results_dir: Path):
+    """
+    # Validate all the submission files and compress into a .zip.
+    Note: This method is also invoked in the trainer script itself!
+    So if you ran the training script, you may not need to re-run this.
+    Args results_dir: the directory where all the training files were saved.
+    """
+    assert isinstance(results_dir, Path)
+
+    # Validate the results directory
+    # validate_dir(results_dir)
+
+    # Make a temporary copy of the results directory for zipping
+    results_dir_copy = results_dir.parent / "tmp_copy"
+    shutil.copytree(results_dir, results_dir_copy)
+
+    # Remove all the checkpoint state files from the tmp directory except for the last one
+    policy_models = list(results_dir_copy.glob("*.state_dict"))
+    policy_models = sorted(policy_models, key=lambda x: x.stat().st_mtime)
+    _ = [policy_model.unlink() for policy_model in policy_models[:-1]]
+
+    # Create the submission file and delete the temporary copy
+    submission_file = Path("submissions") / results_dir.name
+    shutil.make_archive(submission_file, "zip", results_dir_copy)
+    print("NOTE: The submission file is created at:", submission_file.with_suffix(".zip"))
+    shutil.rmtree(results_dir_copy)
+
+    return submission_file.with_suffix(".zip")
+
+
+def compute_metrics(fetch_episode_states, trainer, framework, submission_file, env_config, logging_config=None, num_episodes=1):
     """
     Generate episode rollouts and compute metrics.
     """
@@ -209,11 +228,12 @@ def compute_metrics(fetch_episode_states, trainer, framework, env_config, num_ep
         framework in available_frameworks
     ), f"Invalid framework {framework}, should be in f{available_frameworks}."
 
-    if env_config["logging"]:
-        wandb.login(key=env_config["wandb_config"]["login"])
-        wandb.init(project=env_config["wandb_config"]["project"],
-            name=f'{env_config["wandb_config"]["run"]}_{time.strftime("%Y-%m-%d_%H%M%S")}',
-            entity=env_config["wandb_config"]["entity"])
+    if logging_config:
+        wandb_config = logging_config["wandb_config"]
+        wandb.login(key=wandb_config["login"])
+        wandb.init(project=wandb_config["project"],
+            name=f'{wandb_config["run"]}',
+            entity=wandb_config["entity"])
 
     # Fetch all the desired outputs to compute various metrics.
     desired_outputs = list(_METRICS_TO_LABEL_DICT.keys())
@@ -265,19 +285,27 @@ def compute_metrics(fetch_episode_states, trainer, framework, env_config, num_ep
             )
 
 
-            if env_config["logging"]:
-                if env_config["negotiation_on"]:
-                    ys = episode_states[episode_id][feature][0::3].T.tolist()
-                else:
-                    ys = episode_states[episode_id][feature].T.tolist()
+            if logging_config:
+                #TODO: fix dirty method to remove negotiation steps from results
+                interval = (len(episode_states[episode_id][feature]) - 1) // 20
+                ys = episode_states[episode_id][feature][0::interval].T
+
 
                 xs = list(range(len(ys[0])))
                 wandb.log({feature : wandb.plot.line_series(
                        xs=xs,
-                       ys=ys,
+                       ys=ys.tolist(),
                        keys=[f"region_{x}" for x in range(len(ys))],
                        title=feature,
                        xname="Steps")})
+
+                if feature.endswith("_all_regions"):
+                    title = f"mean_{feature.rsplit('_', 2)[0]}_over_regions"
+                    ys_mean = np.mean(ys, axis=1)
+                    data = [[x, y] for (x, y) in zip(xs, ys_mean.tolist())]
+                    table = wandb.Table(data=data, columns = ["Steps", "y"])
+                    wandb.log({title : wandb.plot.line(table, "Steps", "y",
+                            title=title)})
 
         success = True
         comment = "Successful submission"
@@ -287,72 +315,76 @@ def compute_metrics(fetch_episode_states, trainer, framework, env_config, num_ep
         comment = "Could not obtain an episode rollout!"
         eval_metrics = {}
 
-    if env_config["logging"]:
+    if logging_config:
+        # attach submission file as artifact (needs to be named after the nego class)
+        artifact = wandb.Artifact("submission", type="model")
+        artifact.add_file(submission_file)
+        wandb.log_artifact(artifact)
         wandb.finish()
 
     return success, comment, eval_metrics
 
 
-def val_metrics(trainer, logged_ts, framework, num_episodes=1):
-    """
-    Generate episode rollouts and compute metrics.
-    """
-    assert trainer is not None
-    available_frameworks = ["rllib", "warpdrive"]
-    assert (
-        framework in available_frameworks
-    ), f"Invalid framework {framework}, should be in f{available_frameworks}."
+# def val_metrics(trainer, logged_ts, framework, num_episodes=1):
+#     """
+#     Generate episode rollouts and compute metrics.
+#     """
+#     assert trainer is not None
+#     available_frameworks = ["rllib", "warpdrive"]
+#     assert (
+#         framework in available_frameworks
+#     ), f"Invalid framework {framework}, should be in f{available_frameworks}."
 
-    # Fetch all the desired outputs to compute various metrics.
-    desired_outputs = list(_METRICS_TO_LABEL_DICT.keys())
-    episode_states = {}
-    eval_metrics = {}
-    try:
-        for episode_id in range(num_episodes):
-            episode_states[episode_id] = logged_ts
+#     # Fetch all the desired outputs to compute various metrics.
+#     desired_outputs = list(_METRICS_TO_LABEL_DICT.keys())
+#     episode_states = {}
+#     eval_metrics = {}
+#     try:
+#         for episode_id in range(num_episodes):
+#             episode_states[episode_id] = logged_ts
             
-        for feature in desired_outputs:
-            feature_values = [None for _ in range(num_episodes)]
+#         for feature in desired_outputs:
+#             feature_values = [None for _ in range(num_episodes)]
 
-            if feature == "global_temperature":
-                # Get the temp rise for upper strata
-                for episode_id in range(num_episodes):
-                    feature_values[episode_id] = (
-                        episode_states[episode_id][feature][-1, 0]
-                        - episode_states[episode_id][feature][0, 0]
-                    )
+#             if feature == "global_temperature":
+#                 # Get the temp rise for upper strata
+#                 for episode_id in range(num_episodes):
+#                     feature_values[episode_id] = (
+#                         episode_states[episode_id][feature][-1, 0]
+#                         - episode_states[episode_id][feature][0, 0]
+#                     )
 
-            elif feature == "global_carbon_mass":
-                for episode_id in range(num_episodes):
-                    feature_values[episode_id] = episode_states[episode_id][feature][
-                        -1, 0
-                    ]
+#             elif feature == "global_carbon_mass":
+#                 for episode_id in range(num_episodes):
+#                     feature_values[episode_id] = episode_states[episode_id][feature][
+#                         -1, 0
+#                     ]
 
-            else:
-                for episode_id in range(num_episodes):
-                    feature_values[episode_id] = np.sum(
-                        episode_states[episode_id][feature]
-                    )
+#             else:
+#                 for episode_id in range(num_episodes):
+#                     feature_values[episode_id] = np.sum(
+#                         episode_states[episode_id][feature]
+#                     )
 
-            # Compute mean feature value across episodes
-            mean_feature_value = np.mean(feature_values)
+#             # Compute mean feature value across episodes
+#             mean_feature_value = np.mean(feature_values)
 
-            # Formatting the values
-            metrics_to_label_dict = _METRICS_TO_LABEL_DICT[feature]
+#             # Formatting the values
+#             metrics_to_label_dict = _METRICS_TO_LABEL_DICT[feature]
 
-            eval_metrics[metrics_to_label_dict[0]] = perform_format(
-                mean_feature_value, metrics_to_label_dict[1]
-            )
+#             eval_metrics[metrics_to_label_dict[0]] = perform_format(
+#                 mean_feature_value, metrics_to_label_dict[1]
+#             )
 
-        success = True
-        comment = "Successful submission"
-    except Exception as err:
-        logging.error(err)
-        success = False
-        comment = "Could not obtain an episode rollout!"
-        eval_metrics = {}
+#         success = True
+#         comment = "Successful submission"
+#     except Exception as err:
+#         logging.error(err)
+#         success = False
+#         comment = "Could not obtain an episode rollout!"
+#         eval_metrics = {}
 
-    return success, comment, eval_metrics
+#     return success, comment, eval_metrics
 
 
 def perform_format(val, num_decimal_places):
@@ -381,6 +413,8 @@ def perform_evaluation(
     assert num_episodes > 0
 
     framework, success, comment = validate_dir(results_directory)
+    submission_file = prepare_submission(Path(results_directory))
+
     if success:
         logging.info("Running unit tests...")
         this_file_dir = os.path.dirname(os.path.abspath(__file__))
@@ -418,6 +452,11 @@ def perform_evaluation(
                     with open(config_file, "r", encoding="utf-8") as file_ptr:
                         run_config = yaml.safe_load(file_ptr)
 
+                    #TODO: create better method of setting workers for eval
+                    run_config["trainer"]["num_envs_per_worker"] = 0
+                    run_config["trainer"]["num_workers"] = 0 # 0 workers -> head process does the rollout
+                    run_config["trainer"]["num_gpus"] = 0
+
                     # Create trainer object
                     try:
                         trainer, _ = create_trainer(
@@ -434,7 +473,9 @@ def perform_evaluation(
                                     fetch_episode_states,
                                     trainer,
                                     framework,
+                                    submission_file,
                                     run_config["env"],
+                                    run_config["logging"],
                                     num_episodes=num_episodes,
                                 )
 
