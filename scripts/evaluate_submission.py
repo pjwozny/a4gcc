@@ -218,7 +218,7 @@ def prepare_submission(results_dir: Path):
     return submission_file.with_suffix(".zip")
 
 
-def compute_metrics(fetch_episode_states, trainer, framework, submission_file, env_config, logging_config=None, num_episodes=1):
+def compute_metrics(fetch_episode_states, trainer, framework, submission_file, env_config, log_config=None, num_episodes=1):
     """
     Generate episode rollouts and compute metrics.
     """
@@ -228,8 +228,8 @@ def compute_metrics(fetch_episode_states, trainer, framework, submission_file, e
         framework in available_frameworks
     ), f"Invalid framework {framework}, should be in f{available_frameworks}."
 
-    if logging_config:
-        wandb_config = logging_config["wandb_config"]
+    if log_config["enabled"]:
+        wandb_config = log_config["wandb_config"]
         wandb.login(key=wandb_config["login"])
         wandb.init(project=wandb_config["project"],
             name=f'{wandb_config["run"]}',
@@ -285,7 +285,7 @@ def compute_metrics(fetch_episode_states, trainer, framework, submission_file, e
             )
 
 
-            if logging_config:
+            if log_config["enabled"]:
                 #TODO: fix dirty method to remove negotiation steps from results
                 interval = (len(episode_states[episode_id][feature]) - 1) // 20
                 ys = episode_states[episode_id][feature][0::interval].T
@@ -315,7 +315,7 @@ def compute_metrics(fetch_episode_states, trainer, framework, submission_file, e
         comment = "Could not obtain an episode rollout!"
         eval_metrics = {}
 
-    if logging_config:
+    if log_config["enabled"]:
         # attach submission file as artifact (needs to be named after the nego class)
         artifact = wandb.Artifact("submission", type="model")
         artifact.add_file(submission_file)
