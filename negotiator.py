@@ -1,9 +1,21 @@
+from abc import ABC, abstractmethod
+
 import numpy as np
-from sklearn.metrics import silhouette_score
 from sklearn.cluster import KMeans
+from sklearn.metrics import silhouette_score
 
 
-class BilateralNegotiatorWithOnlyTariff:
+class BaseNegotiator(ABC):
+
+    @abstractmethod
+    def __init__(self) -> None:
+        pass
+
+    def reset(self) -> None:
+        pass
+
+
+class BilateralNegotiatorWithOnlyTariff(BaseNegotiator):
 
     """
     Updated Bi-lateral negotiation included as the original with the following added:
@@ -252,7 +264,7 @@ class BilateralNegotiatorWithOnlyTariff:
         return mask_dict
 
 
-class BilateralNegotiatorWithTariff:
+class BilateralNegotiatorWithTariff(BaseNegotiator):
 
     """
     Updated Bi-lateral negotiation included as the original with the following added:
@@ -519,7 +531,7 @@ class BilateralNegotiatorWithTariff:
 
         return mask_dict
 
-class BasicClubDiscreteDefectClusterProposals:
+class BasicClubDiscreteDefectClusterProposals(BaseNegotiator):
 
     """
     Basic Climate Club. Works as follows:
@@ -878,7 +890,7 @@ class BasicClubDiscreteDefectClusterProposals:
 
         return mask_dict
 
-class BasicClubClusterProposals:
+class BasicClubClusterProposals(BaseNegotiator):
 
     """
     Basic Climate Club. Works as follows:
@@ -1176,7 +1188,7 @@ class BasicClubClusterProposals:
 
         return mask_dict
 
-class BasicClubDiscreteDefect:
+class BasicClubDiscreteDefect(BaseNegotiator):
 
     """
     Basic Climate Club. Works as follows:
@@ -1500,7 +1512,7 @@ class BasicClubDiscreteDefect:
 
         return mask_dict
 
-class BasicClub:
+class BasicClub(BaseNegotiator):
 
     """
     Basic Climate Club. Works as follows:
@@ -1761,7 +1773,7 @@ class BasicClub:
         return mask_dict
 
 
-class BilateralNegotiator:
+class BilateralNegotiator(BaseNegotiator):
 
     """
     Basic Bi-lateral negotiation included as the original
