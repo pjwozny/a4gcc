@@ -375,12 +375,8 @@ class Rice:
                 timestep=self.timestep,
             )
 
-        try:
+        if self.negotiation_on:
             self.negotiator.reset()
-        except Exception as e:
-            print("reset failed")
-            print(str(e))
-            pass
 
         return self.generate_observation()
 
