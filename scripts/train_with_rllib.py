@@ -178,7 +178,6 @@ class EnvWrapper(MultiAgentEnv):
         return recursive_list_to_np_array(obs), rew, done, info
 
 
-<<<<<<< HEAD
 def get_rllib_config(exp_run_config=None, env_class=None, seed=None):
     """
     Reference: https://docs.ray.io/en/latest/rllib-training.html
@@ -231,8 +230,8 @@ def get_rllib_config(exp_run_config=None, env_class=None, seed=None):
         "multiagent": multiagent_config,
         "num_workers": train_config["num_workers"],
         "num_gpus": train_config["num_gpus"],
-        "num_envs_per_worker": 1,#train_config["num_envs"] // train_config["num_workers"],
-        "train_batch_size": train_config["train_batch_size_in_episodes"],
+        "num_envs_per_worker": train_config["num_envs"] // train_config["num_workers"],
+        "train_batch_size": train_config["train_batch_size"],
     }
     if seed is not None:
         rllib_config["seed"] = seed
@@ -240,8 +239,6 @@ def get_rllib_config(exp_run_config=None, env_class=None, seed=None):
     return rllib_config
 
 
-=======
->>>>>>> development
 def save_model_checkpoint(trainer_obj=None, save_directory=None, current_timestep=0):
     """
     Save trained model checkpoints.
@@ -394,59 +391,6 @@ def fetch_episode_states(trainer_obj=None, episode_states=None):
             break
 
     return outputs
-
-def run_free_rider_condition(env, condition, metrics = []):
-
-    metrics = []
-
-    for timestep in range(env.episode_length):
-        for state in episode_states:
-            outputs[state][timestep] = env.global_state[state]["value"][timestep]
-
-        actions = {}
-        # TODO: Consider using the `compute_actions` (instead of `compute_action`)
-        # API below for speed-up when there are many agents.
-        for region_id in range(env.num_agents):
-            if (
-                len(agent_states[region_id]) == 0
-            ):  # stateless, with a linear model, for example
-                actions[region_id] = trainer_obj.compute_action(
-                    obs[region_id],
-                    agent_states[region_id],
-                    policy_id=policy_ids[region_id],
-                )
-            else:  # stateful
-                (
-                    actions[region_id],
-                    agent_states[region_id],
-                    _,
-                ) = trainer_obj.compute_action(
-                    obs[region_id],
-                    agent_states[region_id],
-                    policy_id=policy_ids[region_id],
-                )
-
-            if region_id == fr_id:
-                #set region to defect regardless of previous decision.
-                actions[region_id][action_offset_index : action_offset_index + num_defect_actions] = 1
-
-                
-        #get tariffs aginst agents
-        average_fr_tariffs = np.mean([actions[region_id][tariff_offset:tariff_offset+number_tariff_actions][fr_id] for region_id in range(env.num_agents) if region_id !=fr_id])
-        reward = env.get_global_state("reward_all_regions", timestep, fr_id)
-        average_tariffs.append({
-            "fr_tariffs":float(average_fr_tariffs),
-            "fr_reward":float(reward)
-        })
-        
-        
-        obs, _, done, _ = env_object.step(actions)
-        if done["__all__"]:
-            for state in episode_states:
-                outputs[state][timestep + 1] = env.global_state[state]["value"][
-                    timestep + 1
-                ]
-            break
 
 
 def fetch_episode_states_freerider(trainer_obj=None, episode_states=None):
