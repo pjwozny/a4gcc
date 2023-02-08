@@ -29,19 +29,22 @@ from scripts.fixed_paths import PUBLIC_REPO_DIR
 
 sys.path.append(PUBLIC_REPO_DIR)
 
-from scripts.create_submission_zip import prepare_submission
 from scripts.environment_wrapper import EnvWrapper
-from scripts.evaluate_submission import perform_evaluation
 from scripts.torch_models import TorchLinear
+from scripts.evaluate_submission import perform_evaluation
 
 ModelCatalog.register_custom_model("torch_linear", TorchLinear)
-
 
 
 def train(run_config, save_dir):
     # Copy relevant source files
     # ------------------------------------------------
-    copy_files = ["rice.py", "negotiator.py", "rice_helpers.py", "scripts/rice_rllib.yaml"]
+    copy_files = [
+        "rice.py",
+        "negotiator.py",
+        "rice_helpers.py",
+        "scripts/rice_rllib.yaml",
+    ]
     for file in copy_files:
         shutil.copy(file, save_dir)
     # shutil.copytree("scripts_submit", save_dir)
@@ -56,10 +59,9 @@ def train(run_config, save_dir):
     # Perform training
     # ------------------------------------------------
     num_episodes = run_config["trainer"]["num_episodes"]
-    train_batch_size = run_config["trainer"]["train_batch_size"]
+    train_batch_size = trainer.config["train_batch_size"]
     model_save_freq = run_config["saving"]["model_params_save_freq"]
     # Fetch the env object from the trainer
-    # trainer.
     episode_length = EnvWrapper(run_config["env"]).env.episode_length
     num_iters = (num_episodes * episode_length) // train_batch_size
 
@@ -67,15 +69,29 @@ def train(run_config, save_dir):
         print(f"********** Iter : {iteration + 1:5d} / {num_iters:5d} **********")
         result = trainer.train()
         print(f"episode_reward_mean: {result.get('episode_reward_mean')}")
+        wandb.log(
+            {
+                "episode_reward_min": result["episode_reward_min"],
+                "episode_reward_mean": result["episode_reward_mean"],
+                "episode_reward_max": result["episode_reward_max"],
+            },
+            step=result["episodes_total"],
+        )
+        wandb.log(
+            result["info"]["learner"]["regions"]["learner_stats"],
+            step=result["episodes_total"],
+        )
 
         if iteration % model_save_freq == 0 or iteration + 1 == num_iters:
             total_timesteps = result.get("timesteps_total")
             save_model_checkpoint(trainer, save_dir, total_timesteps)
             logging.info(result)
 
+    wandb.finish()
+
     # Create a (zipped) submission file
     # ---------------------------------
-    prepare_submission(save_dir)
+    # prepare_submission(save_dir)
 
     # Close Ray gracefully after completion
     ray.shutdown()
@@ -123,18 +139,21 @@ def get_rllib_config(run_config=None, env_class=None, seed=None):
         "policy_mapping_fn": policy_mapping_fn,
     }
 
+    episode_length = EnvWrapper(run_config["env"]).env.episode_length
     train_config = run_config["trainer"]
     rllib_config = {
         # Arguments dict passed to the env creator as an EnvContext object (which
         # is a dict plus the properties: num_workers, worker_index, vector_index,
         # and remote).
+        "batch_mode": train_config["batch_mode"],
         "env_config": run_config["env"],
         "framework": train_config["framework"],
         "multiagent": multiagent_config,
         "num_workers": train_config["num_workers"],
         "num_gpus": train_config["num_gpus"],
-        "num_envs_per_worker": train_config["num_envs"] // train_config["num_workers"],
-        "train_batch_size": train_config["train_batch_size"],
+        "num_envs_per_worker": train_config["num_envs_per_worker"],
+        "train_batch_size": train_config["train_batch_size_in_episodes"]
+        * episode_length,
     }
     if seed is not None:
         rllib_config["seed"] = seed
@@ -221,18 +240,20 @@ if __name__ == "__main__":
 
     with open(config_path, "r", encoding="utf8") as fp:
         run_config = yaml.safe_load(fp)
-    
+
     # Create the save directory
     save_dir = Path("experiments") / time.strftime("%Y-%m-%d_%H%M%S")
     save_dir.mkdir(parents=True)
 
     # Initialize wandb
-    if run_config["env"]["logging"]:
-        wandb_config = run_config["env"]["wandb_config"]
+    if run_config["logging"]["enabled"]:
+        wandb_config = run_config["logging"]["wandb_config"]
         wandb.login(key=wandb_config["login"])
-        wandb.init(project=wandb_config["project"],
-            name=f'{wandb_config["run"]}_{time.strftime("%Y-%m-%d_%H%M%S")}',
-            entity=wandb_config["entity"])
+        wandb.init(
+            project=wandb_config["project"],
+            name=f'{wandb_config["run"]}',
+            entity=wandb_config["entity"],
+        )
 
     # Write timestamp of start training
     with open(save_dir / "timestamp.txt", "a") as f:
@@ -242,8 +263,8 @@ if __name__ == "__main__":
     with open(save_dir / "timestamp.txt", "a") as f:
         f.write(f"STOP:\t{time.strftime('%Y-%m-%d_%H:%M:%S')}\n")
 
-    # framework_used, succeeded, metrics, comments = perform_evaluation(save_dir)
-    # print(f"Framework used: {framework_used}")
-    # print(f"Succeeded: {succeeded}")
-    # print(f"Metrics: {metrics}")
-    # print(f"Comments: {comments}")
+    framework_used, succeeded, metrics, comments = perform_evaluation(save_dir)
+    print(f"Framework used: {framework_used}")
+    print(f"Succeeded: {succeeded}")
+    print(f"Metrics: {metrics}")
+    print(f"Comments: {comments}")

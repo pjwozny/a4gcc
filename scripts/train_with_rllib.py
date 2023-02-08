@@ -10,6 +10,7 @@ Training script for the rice environment using RLlib
 https://docs.ray.io/en/latest/rllib-training.html
 """
 
+import glob
 import logging
 import os
 import shutil
@@ -23,6 +24,7 @@ from random import choice
 
 import yaml
 from run_unittests import import_class_from_path
+from train import get_rllib_config
 from desired_outputs import desired_outputs
 from fixed_paths import PUBLIC_REPO_DIR
 
@@ -176,6 +178,7 @@ class EnvWrapper(MultiAgentEnv):
         return recursive_list_to_np_array(obs), rew, done, info
 
 
+<<<<<<< HEAD
 def get_rllib_config(exp_run_config=None, env_class=None, seed=None):
     """
     Reference: https://docs.ray.io/en/latest/rllib-training.html
@@ -237,6 +240,8 @@ def get_rllib_config(exp_run_config=None, env_class=None, seed=None):
     return rllib_config
 
 
+=======
+>>>>>>> development
 def save_model_checkpoint(trainer_obj=None, save_directory=None, current_timestep=0):
     """
     Save trained model checkpoints.
@@ -267,14 +272,18 @@ def load_model_checkpoints(trainer_obj=None, save_directory=None, ckpt_idx=-1):
         "Invalid folder path. "
         "Please specify a valid directory to load the checkpoints from."
     )
-    files = [f for f in os.listdir(save_directory) if f.endswith("state_dict")]
+    
+    #TODO: Quick fix to solve multiple state_dict issue. Should be done properly.
+    # Old method assumed that multiple state_dicts indicate multiple policies in stead of checkpoints.
+    files = [sorted(glob.glob(f"{save_directory}/*.state_dict"))[0]]
+    # files = [f for f in os.listdir(save_directory) if f.endswith("state_dict")]
 
     assert len(files) == len(trainer_obj.config["multiagent"]["policies"])
 
     model_params = trainer_obj.get_weights()
     for policy in model_params:
         policy_models = [
-            os.path.join(save_directory, file) for file in files if policy in file
+            file for file in files if policy in file
         ]
         # If there are multiple files, then use the ckpt_idx to specify the checkpoint
         assert ckpt_idx < len(policy_models)
@@ -312,7 +321,7 @@ def create_trainer(exp_run_config=None, source_dir=None, results_dir=None, seed=
     rllib_trainer = A2CTrainer(
         env=EnvWrapper,
         config=get_rllib_config(
-            exp_run_config=exp_run_config, env_class=EnvWrapper, seed=seed
+            run_config=exp_run_config, env_class=EnvWrapper, seed=seed
         ),
     )
     return rllib_trainer, results_save_dir
@@ -361,7 +370,7 @@ def fetch_episode_states(trainer_obj=None, episode_states=None):
             if (
                 len(agent_states[region_id]) == 0
             ):  # stateless, with a linear model, for example
-                actions[region_id] = trainer_obj.compute_action(
+                actions[region_id] = trainer_obj.compute_single_action(
                     obs[region_id],
                     agent_states[region_id],
                     policy_id=policy_ids[region_id],
@@ -371,7 +380,7 @@ def fetch_episode_states(trainer_obj=None, episode_states=None):
                     actions[region_id],
                     agent_states[region_id],
                     _,
-                ) = trainer_obj.compute_action(
+                ) = trainer_obj.compute_single_action(
                     obs[region_id],
                     agent_states[region_id],
                     policy_id=policy_ids[region_id],
