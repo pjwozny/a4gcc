@@ -26,6 +26,7 @@ from random import choice
 import yaml
 from run_unittests import import_class_from_path
 from train import get_rllib_config
+from environment_wrapper import EnvWrapper
 from desired_outputs import desired_outputs
 from fixed_paths import PUBLIC_REPO_DIR
 
