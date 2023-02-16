@@ -69,25 +69,29 @@ def train(run_config, save_dir):
         print(f"********** Iter : {iteration + 1:5d} / {num_iters:5d} **********")
         result = trainer.train()
         print(f"episode_reward_mean: {result.get('episode_reward_mean')}")
-        wandb.log(
-            {
-                "episode_reward_min": result["episode_reward_min"],
-                "episode_reward_mean": result["episode_reward_mean"],
-                "episode_reward_max": result["episode_reward_max"],
-            },
-            step=result["episodes_total"],
-        )
-        wandb.log(
-            result["info"]["learner"]["regions"]["learner_stats"],
-            step=result["episodes_total"],
-        )
+
+        if run_config["logging"]["enabled"]:
+            wandb.log(
+                {
+                    "episode_reward_min": result["episode_reward_min"],
+                    "episode_reward_mean": result["episode_reward_mean"],
+                    "episode_reward_max": result["episode_reward_max"],
+                },
+                step=result["episodes_total"],
+            )
+            wandb.log(
+                result["info"]["learner"]["regions"]["learner_stats"],
+                step=result["episodes_total"],
+            )
 
         if iteration % model_save_freq == 0 or iteration + 1 == num_iters:
             total_timesteps = result.get("timesteps_total")
             save_model_checkpoint(trainer, save_dir, total_timesteps)
             logging.info(result)
 
-    wandb.finish()
+
+    if run_config["logging"]["enabled"]:
+        wandb.finish()
 
     # Create a (zipped) submission file
     # ---------------------------------
@@ -251,7 +255,7 @@ if __name__ == "__main__":
         wandb.login(key=wandb_config["login"])
         wandb.init(
             project=wandb_config["project"],
-            name=f'{wandb_config["run"]}',
+            name=f'{wandb_config["run"]}_train',
             entity=wandb_config["entity"],
         )
 
