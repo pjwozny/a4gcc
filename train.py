@@ -156,8 +156,11 @@ def get_rllib_config(run_config, env_class, seed=None):
         "num_workers": train_config["num_workers"],
         "num_gpus": train_config["num_gpus"],
         "num_envs_per_worker": train_config["num_envs_per_worker"],
+        "num_cpus_per_worker": train_config["num_cpus_per_worker"],
         "train_batch_size": train_config["train_batch_size_in_episodes"]
         * episode_length,
+        "ignore_worker_failures": train_config["ignore_worker_failures"],
+        "recreate_failed_workers": train_config["recreate_failed_workers"],
     }
     if seed is not None:
         rllib_config["seed"] = seed

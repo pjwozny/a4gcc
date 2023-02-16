@@ -23,7 +23,10 @@ trainer:
     num_episodes: 100000 # number of episodes to run the training for
     framework: torch # framework setting.
     # Note: RLlib supports TF as well, but our end-to-end pipeline is built for Pytorch only.
+    ignore_worker_failures: True
+    recreate_failed_workers: True
     # === Hardware Settings ===
+    num_cpus_per_worker: 1
     num_gpus: 1 # number of GPUs to allocate to the trainer process. This can also be fractional (e.g., 0.3 GPUs).
 
 logging:
