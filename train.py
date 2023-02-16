@@ -101,13 +101,10 @@ def train(run_config, save_dir):
     ray.shutdown()
 
 
-def get_rllib_config(run_config=None, env_class=None, seed=None):
+def get_rllib_config(run_config, env_class, seed=None):
     """
     Reference: https://docs.ray.io/en/latest/rllib-training.html
     """
-
-    assert run_config is not None
-    assert env_class is not None
 
     env_config = run_config["env"]
     assert isinstance(env_config, dict)
