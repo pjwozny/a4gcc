@@ -336,7 +336,7 @@ def fetch_episode_states(trainer_obj=None, episode_states=None):
     outputs = {}
 
     # Fetch the env object from the trainer
-    env_object = trainer_obj.workers.local_worker().env
+    env_object: EnvWrapper = trainer_obj.workers.local_worker().env
     obs = env_object.reset()
 
     env = env_object.env
