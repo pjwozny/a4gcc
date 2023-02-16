@@ -10,9 +10,10 @@ Training script for the rice environment using RLlib
 https://docs.ray.io/en/latest/rllib-training.html
 """
 
-import glob
+from collections import defaultdict
 import logging
 import os
+from pathlib import Path
 import shutil
 import subprocess
 import sys
@@ -270,23 +271,21 @@ def load_model_checkpoints(trainer_obj=None, save_directory=None, ckpt_idx=-1):
         "Please specify a valid directory to load the checkpoints from."
     )
     
-    #TODO: Quick fix to solve multiple state_dict issue. Should be done properly.
-    # Old method assumed that multiple state_dicts indicate multiple policies in stead of checkpoints.
-    files = [sorted(glob.glob(f"{save_directory}/*.state_dict"))[0]]
-    # files = [f for f in os.listdir(save_directory) if f.endswith("state_dict")]
+    policy_name_files = defaultdict(list)
+    for file in Path(save_directory).glob("*.state_dict"):
+        policy_name = file.stem.split("_")[0]
+        policy_name_files[policy_name].append(file)
 
-    assert len(files) == len(trainer_obj.config["multiagent"]["policies"])
+    assert len(policy_name_files) == len(trainer_obj.config["multiagent"]["policies"])
 
     model_params = trainer_obj.get_weights()
-    for policy in model_params:
-        policy_models = [
-            file for file in files if policy in file
-        ]
+    for policy_name in model_params:
+        policy_models = policy_name_files[policy_name]
         # If there are multiple files, then use the ckpt_idx to specify the checkpoint
         assert ckpt_idx < len(policy_models)
-        sorted_policy_models = sorted(policy_models, key=os.path.getmtime)
+        sorted_policy_models = sorted(policy_models, key=lambda x: int(x.stem.split("_")[-1]))
         policy_model_file = sorted_policy_models[ckpt_idx]
-        model_params[policy] = torch.load(policy_model_file)
+        model_params[policy_name] = torch.load(policy_model_file)
         logging.info(f"Loaded model checkpoints {policy_model_file}.")
 
     trainer_obj.set_weights(model_params)
