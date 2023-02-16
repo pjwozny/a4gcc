@@ -7,8 +7,8 @@
 
 # Checkpoint saving setting
 saving:
-    metrics_log_freq: 100 # how often (in iterations) to log (and print) the metrics
-    model_params_save_freq: 1000 # how often (in iterations) to save the model parameters
+    metrics_log_freq: 100 # how often (in episodes) to log (and print) the metrics
+    model_params_save_freq: 100 # how often (in episodes) to save the model parameters
     basedir: "/tmp" # base folder used for saving
     name: "rice" # experiment name
     tag: "experiments" # experiment tag
@@ -18,9 +18,9 @@ trainer:
     num_workers: 30 # number of rollout worker actors to create for parallel sampling.
     # Note: Setting the num_workers to 0 will force rollouts to be done in the trainer actor.
     num_envs_per_worker: 1 # number of environment replicas per worker
-    batch_mode: "complete_episodes"
-    train_batch_size_in_episodes: 16 # total batch size used for training per iteration (across all the environments)
-    num_episodes: 100 # number of episodes to run the training for
+    batch_mode: "complete_episodes" # complete_episodes/truncate_episodes
+    train_batch_size_in_episodes: 60 # total batch size used for training per iteration (across all the environments)
+    num_episodes: 100000 # number of episodes to run the training for
     framework: torch # framework setting.
     # Note: RLlib supports TF as well, but our end-to-end pipeline is built for Pytorch only.
     # === Hardware Settings ===

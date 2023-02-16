@@ -59,14 +59,13 @@ def train(run_config, save_dir):
     # Perform training
     # ------------------------------------------------
     num_episodes = run_config["trainer"]["num_episodes"]
-    train_batch_size = trainer.config["train_batch_size"]
     model_save_freq = run_config["saving"]["model_params_save_freq"]
-    # Fetch the env object from the trainer
-    episode_length = EnvWrapper(run_config["env"]).env.episode_length
-    num_iters = (num_episodes * episode_length) // train_batch_size
 
-    for iteration in range(num_iters):
-        print(f"********** Iter : {iteration + 1:5d} / {num_iters:5d} **********")
+    result = {"episodes_total": 0}
+    while result["episodes_total"] < num_episodes:
+        print(
+            f"********** Episodes : {result['episodes_total']:5d} / {num_episodes:5d} **********"
+        )
         result = trainer.train()
         print(f"episode_reward_mean: {result.get('episode_reward_mean')}")
 
@@ -84,11 +83,14 @@ def train(run_config, save_dir):
                 step=result["episodes_total"],
             )
 
-        if iteration % model_save_freq == 0 or iteration + 1 == num_iters:
-            total_timesteps = result.get("timesteps_total")
-            save_model_checkpoint(trainer, save_dir, total_timesteps)
+        if result["episodes_total"] % model_save_freq == 0:
+            total_episodes = result["episodes_total"]
+            save_model_checkpoint(trainer, save_dir, total_episodes)
             logging.info(result)
 
+    total_episodes = result["episodes_total"]
+    save_model_checkpoint(trainer, save_dir, total_episodes)
+    logging.info(result)
 
     if run_config["logging"]["enabled"]:
         wandb.finish()
@@ -147,6 +149,7 @@ def get_rllib_config(run_config, env_class, seed=None):
         # is a dict plus the properties: num_workers, worker_index, vector_index,
         # and remote).
         "batch_mode": train_config["batch_mode"],
+        "rollout_fragment_length": episode_length,
         "env_config": run_config["env"],
         "framework": train_config["framework"],
         "multiagent": multiagent_config,
