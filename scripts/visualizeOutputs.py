@@ -30,7 +30,7 @@ def constructStackedBarChart(global_states, wandb,
     #simplify output to 1 per timestep otherwise the data is repeated per negotiation step
     run_length = 20
     step_size = int(rates_over_time.shape[0] / run_length)
-    
+
     #per timestep get rate counts
     for timestep in range(0,rates_over_time.shape[0], step_size):
 
@@ -52,9 +52,8 @@ def constructStackedBarChart(global_states, wandb,
     plt.ylabel(f"# of Countries of a Given {y_axis_field}")
     plt.xlabel("Timesteps")
     plt.title(f"{field} Distribution")
-    plt.show()
     wandb.log({f"{y_axis_field} Counts Across Time":plt})
-        
+       
 
 
 
