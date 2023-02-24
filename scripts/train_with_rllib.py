@@ -393,8 +393,6 @@ def fetch_episode_states(trainer_obj=None, episode_states=None):
                     timestep + 1
                 ]
             break
-    with open("global_state_dict.pkl", "wb") as f:
-        pkl.dump(env.global_state, f, protocol = pkl.HIGHEST_PROTOCOL)
 
     return outputs
 
@@ -539,6 +537,8 @@ def fetch_episode_states_freerider(trainer_obj=None, episode_states=None):
                         timestep + 1
                     ]
                 break
+    
+
 
     current_time = time.strftime("%H:%M:%S", time.localtime())
     file_name = f"fr_{fr_id}_{current_time}.json"
