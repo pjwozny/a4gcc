@@ -310,7 +310,6 @@ def compute_metrics(fetch_episode_states, trainer, framework, submission_file, e
         framework in available_frameworks
     ), f"Invalid framework {framework}, should be in f{available_frameworks}."
 
-    log_config = False 
     if log_config and log_config["enabled"]:
         wandb_config = log_config["wandb_config"]
         wandb.login(key=wandb_config["login"])
