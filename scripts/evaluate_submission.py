@@ -21,7 +21,7 @@ from collections import OrderedDict
 import numpy as np
 import wandb
 import yaml
-
+import pickle as pkl
 from pathlib import Path
 
 _path = Path(os.path.abspath(__file__))
@@ -33,6 +33,59 @@ print("Using PUBLIC_REPO_DIR = {}".format(PUBLIC_REPO_DIR))
 _PRIVATE_REPO_DIR = os.path.join(_path.parent.parent.parent.absolute(), "private-repo-clone")
 sys.path.append(os.path.join(_PRIVATE_REPO_DIR, "backend"))
 print("Using _PRIVATE_REPO_DIR = {}".format(_PRIVATE_REPO_DIR))
+
+import pickle as pkl
+import numpy as np
+from collections import Counter
+import matplotlib.pyplot as plt
+import pandas as pd
+
+def constructStackedBarChart(global_states, 
+                            num_discrete_actions = 10, 
+                            field = "minimum_mitigation_rate_all_regions"):
+
+    """
+    Constructs a Stacked Bar Chart for each timestep of a given run
+    Note: this is only useful where there is a single value per country, 
+        ie self-directed country actions, such as mitigation. 
+
+    Args:
+        global_state(dict): the global state dictionary of a completed run
+        field(str): the name of the field to extract, defualt is minimum_mitigation_rates
+        wandb(wandb-object): an already initialized and open wandb object
+                indicating where the plot should be sent
+    """
+
+
+    rates_over_time = global_states[field]
+    possible_rates = range(0,num_discrete_actions-1)
+    to_plot = {rate:[] for rate in possible_rates}
+
+    #per timestep get rate counts
+    for timestep in range(rates_over_time.shape[0]):
+        current_rates = rates_over_time[timestep,:]
+        current_counter = Counter(current_rates)
+        for rate in possible_rates:
+            #count countries with a particular rate
+            if rate in current_counter.keys():
+                to_plot[rate].append(current_counter[rate])
+            #if no countries have that particular rate
+            else:
+                to_plot[rate].append(0)
+
+    pdf = pd.DataFrame(to_plot)
+    pdf.plot(kind='bar', stacked=True).legend(loc='center left',bbox_to_anchor=(1.0, 0.5))
+    plt.xlabel(f"Countries of a Given {field}")
+    plt.ylabel("Timesteps")
+    plt.title(f"{field} Distribution")
+    plt.show()
+    # wandb.log({f"{field}":plt})
+
+        
+
+
+
+
 
 
 # Set logger level e.g., DEBUG, INFO, WARNING, ERROR.
@@ -69,7 +122,7 @@ _METRICS_TO_LABEL_DICT["current_balance_all_regions"] = ("Current Balance", 2)
 _METRICS_TO_LABEL_DICT["gross_output_all_regions"] = ("Gross Output", 2)
 _METRICS_TO_LABEL_DICT["investment_all_regions"] = ("Investment", 2)
 _METRICS_TO_LABEL_DICT["production_all_regions"] = ("Production", 2)
-# _METRICS_TO_LABEL_DICT["minimum_mitigation_rate_all_regions"] = ("Minimum Mitigation Rate", 0)
+_METRICS_TO_LABEL_DICT["minimum_mitigation_rate_all_regions"] = ("Minimum Mitigation Rate", 0)
 # _METRICS_TO_LABEL_DICT["
 # _METRICS_TO_LABEL_DICT["
 
@@ -96,6 +149,8 @@ def get_imports(framework=None):
         from train_with_rllib import (
             create_trainer,
             fetch_episode_states,
+            fetch_episode_states_freerider,
+            fetch_episode_states_tariff,
             load_model_checkpoints,
         )
     elif framework == "warpdrive":
@@ -106,13 +161,21 @@ def get_imports(framework=None):
         )
     else:
         raise ValueError(f"Unknown framework {framework}!")
+
+    episode_fetchers = {
+        "fr":fetch_episode_states_freerider,
+        "tariff":fetch_episode_states_tariff,
+        "none":fetch_episode_states
+    }
+
+    parser = parse_args()
+    args = parser.parse_args()
+    fetch_episode_states = episode_fetchers[args.experiment]
+
     return create_trainer, load_model_checkpoints, fetch_episode_states
 
 
-def get_results_dir():
-    """
-    Obtain the 'results' directory from the system arguments.
-    """
+def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--results_dir",
@@ -122,6 +185,25 @@ def get_results_dir():
         "the zipped file containing all the submission files.",
         required=True,
     )
+
+    parser.add_argument(
+        "--experiment",
+        "-e",
+        type=str,
+        help="which experiment to run",
+        default="none",
+        required=False,
+    )
+
+    return parser
+
+
+def get_results_dir():
+    """
+    Obtain the 'results' directory from the system arguments.
+    """
+
+    parser = parse_args()
     args = parser.parse_args()
     results_dir = args.results_dir
 
@@ -250,6 +332,17 @@ def compute_metrics(fetch_episode_states, trainer, framework, submission_file, e
                 episode_states[episode_id] = trainer.fetch_episode_global_states(
                     desired_outputs
                 )
+        
+        with open("episode_states.pkl", "wb") as f:
+            pkl.dump(episode_states[0], f, protocol=pkl.HIGHEST_PROTOCOL)
+        
+        #log mitigation rate counts of each country over time
+        constructStackedBarChart(episode_states[0],wandb,
+                                    field="mitigation_rate_all_regions")
+
+        #log minimum mitigation rate counts of each country over time
+        constructStackedBarChart(episode_states[0], wandb,
+                                    field="minimum_mitigation_rate_all_regions")
 
         for feature in desired_outputs:
             feature_values = [None for _ in range(num_episodes)]
@@ -325,66 +418,66 @@ def compute_metrics(fetch_episode_states, trainer, framework, submission_file, e
     return success, comment, eval_metrics
 
 
-# def val_metrics(trainer, logged_ts, framework, num_episodes=1):
-#     """
-#     Generate episode rollouts and compute metrics.
-#     """
-#     assert trainer is not None
-#     available_frameworks = ["rllib", "warpdrive"]
-#     assert (
-#         framework in available_frameworks
-#     ), f"Invalid framework {framework}, should be in f{available_frameworks}."
+def val_metrics(trainer, logged_ts, framework, num_episodes=1):
+    """
+    Generate episode rollouts and compute metrics.
+    """
+    assert trainer is not None
+    available_frameworks = ["rllib", "warpdrive"]
+    assert (
+        framework in available_frameworks
+    ), f"Invalid framework {framework}, should be in f{available_frameworks}."
 
-#     # Fetch all the desired outputs to compute various metrics.
-#     desired_outputs = list(_METRICS_TO_LABEL_DICT.keys())
-#     episode_states = {}
-#     eval_metrics = {}
-#     try:
-#         for episode_id in range(num_episodes):
-#             episode_states[episode_id] = logged_ts
+    # Fetch all the desired outputs to compute various metrics.
+    desired_outputs = list(_METRICS_TO_LABEL_DICT.keys())
+    episode_states = {}
+    eval_metrics = {}
+    try:
+        for episode_id in range(num_episodes):
+            episode_states[episode_id] = logged_ts
             
-#         for feature in desired_outputs:
-#             feature_values = [None for _ in range(num_episodes)]
+        for feature in desired_outputs:
+            feature_values = [None for _ in range(num_episodes)]
 
-#             if feature == "global_temperature":
-#                 # Get the temp rise for upper strata
-#                 for episode_id in range(num_episodes):
-#                     feature_values[episode_id] = (
-#                         episode_states[episode_id][feature][-1, 0]
-#                         - episode_states[episode_id][feature][0, 0]
-#                     )
+            if feature == "global_temperature":
+                # Get the temp rise for upper strata
+                for episode_id in range(num_episodes):
+                    feature_values[episode_id] = (
+                        episode_states[episode_id][feature][-1, 0]
+                        - episode_states[episode_id][feature][0, 0]
+                    )
 
-#             elif feature == "global_carbon_mass":
-#                 for episode_id in range(num_episodes):
-#                     feature_values[episode_id] = episode_states[episode_id][feature][
-#                         -1, 0
-#                     ]
+            elif feature == "global_carbon_mass":
+                for episode_id in range(num_episodes):
+                    feature_values[episode_id] = episode_states[episode_id][feature][
+                        -1, 0
+                    ]
 
-#             else:
-#                 for episode_id in range(num_episodes):
-#                     feature_values[episode_id] = np.sum(
-#                         episode_states[episode_id][feature]
-#                     )
+            else:
+                for episode_id in range(num_episodes):
+                    feature_values[episode_id] = np.sum(
+                        episode_states[episode_id][feature]
+                    )
 
-#             # Compute mean feature value across episodes
-#             mean_feature_value = np.mean(feature_values)
+            # Compute mean feature value across episodes
+            mean_feature_value = np.mean(feature_values)
 
-#             # Formatting the values
-#             metrics_to_label_dict = _METRICS_TO_LABEL_DICT[feature]
+            # Formatting the values
+            metrics_to_label_dict = _METRICS_TO_LABEL_DICT[feature]
 
-#             eval_metrics[metrics_to_label_dict[0]] = perform_format(
-#                 mean_feature_value, metrics_to_label_dict[1]
-#             )
+            eval_metrics[metrics_to_label_dict[0]] = perform_format(
+                mean_feature_value, metrics_to_label_dict[1]
+            )
 
-#         success = True
-#         comment = "Successful submission"
-#     except Exception as err:
-#         logging.error(err)
-#         success = False
-#         comment = "Could not obtain an episode rollout!"
-#         eval_metrics = {}
+        success = True
+        comment = "Successful submission"
+    except Exception as err:
+        logging.error(err)
+        success = False
+        comment = "Could not obtain an episode rollout!"
+        eval_metrics = {}
 
-#     return success, comment, eval_metrics
+    return success, comment, eval_metrics
 
 
 def perform_format(val, num_decimal_places):
