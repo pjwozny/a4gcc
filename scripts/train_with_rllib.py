@@ -19,6 +19,7 @@ import subprocess
 import sys
 import time
 import json
+import pickle as pkl
 
 import numpy as np
 from random import choice
@@ -158,7 +159,9 @@ class EnvWrapper(MultiAgentEnv):
             del env_config_copy["source_dir"]
         if source_dir is None:
             source_dir = PUBLIC_REPO_DIR
+        source_dir = PUBLIC_REPO_DIR
         assert isinstance(env_config_copy, dict)
+        print(env_config_copy)
         self.env = import_class_from_path("Rice", os.path.join(source_dir, "rice.py"))(
             **env_config_copy
         )
@@ -180,7 +183,7 @@ class EnvWrapper(MultiAgentEnv):
         return recursive_list_to_np_array(obs), rew, done, info
 
 
-def get_rllib_config(exp_run_config=None, env_class=None, seed=None):
+def get_rllib_config_(exp_run_config=None, env_class=None, seed=None):
     """
     Reference: https://docs.ray.io/en/latest/rllib-training.html
     """
@@ -277,6 +280,7 @@ def load_model_checkpoints(trainer_obj=None, save_directory=None, ckpt_idx=-1):
         policy_name = file.stem.split("_")[0]
         policy_name_files[policy_name].append(file)
 
+    print(policy_name_files)
     assert len(policy_name_files) == len(trainer_obj.config["multiagent"]["policies"])
 
     model_params = trainer_obj.get_weights()
@@ -318,7 +322,7 @@ def create_trainer(exp_run_config=None, source_dir=None, results_dir=None, seed=
     rllib_trainer = A2CTrainer(
         env=EnvWrapper,
         config=get_rllib_config(
-            run_config=exp_run_config, env_class=EnvWrapper, seed=seed
+            exp_run_config, env_class=EnvWrapper, seed=seed
         ),
     )
     return rllib_trainer, results_save_dir
@@ -389,6 +393,8 @@ def fetch_episode_states(trainer_obj=None, episode_states=None):
                     timestep + 1
                 ]
             break
+    with open("global_state_dict.pkl", "wb") as f:
+        pkl.dump(env.global_state, f, protocol = pkl.HIGHEST_PROTOCOL)
 
     return outputs
 
@@ -467,7 +473,7 @@ def fetch_episode_states_freerider(trainer_obj=None, episode_states=None):
                 if (
                     len(agent_states[region_id]) == 0
                 ):  # stateless, with a linear model, for example
-                    actions[region_id] = trainer_obj.compute_action(
+                    actions[region_id] = trainer_obj.compute_single_action(
                         obs[region_id],
                         agent_states[region_id],
                         policy_id=policy_ids[region_id],
@@ -477,7 +483,7 @@ def fetch_episode_states_freerider(trainer_obj=None, episode_states=None):
                         actions[region_id],
                         agent_states[region_id],
                         _,
-                    ) = trainer_obj.compute_action(
+                    ) = trainer_obj.compute_single_action(
                         obs[region_id],
                         agent_states[region_id],
                         policy_id=policy_ids[region_id],
@@ -542,193 +548,7 @@ def fetch_episode_states_freerider(trainer_obj=None, episode_states=None):
 
     return outputs
 
-def fetch_episode_states_tariff(trainer_obj=None, episode_states=None):
-    """
-    Helper function to rollout the env and fetch env states for an episode.
-    """
-    assert trainer_obj is not None
-    assert episode_states is not None
-    assert isinstance(episode_states, list)
-    assert len(episode_states) > 0
 
-    outputs = {}
-
-    
-    
-    # Fetch the env object from the trainer
-    env_object = trainer_obj.workers.local_worker().env
-    obs = env_object.reset()
-
-    env = env_object.env
-    
-    #choose one agent to be the freerider
-    pariah_id = np.random.randint(0,env.num_agents) 
-
-    for state in episode_states:
-        assert state in env.global_state, f"{state} is not in global state!"
-        # Initialize the episode states
-        array_shape = env.global_state[state]["value"].shape
-        outputs[state] = np.nan * np.ones(array_shape)
-
-    agent_states = {}
-    policy_ids = {}
-    policy_mapping_fn = trainer_obj.config["multiagent"]["policy_mapping_fn"]
-    for region_id in range(env.num_regions):
-        policy_ids[region_id] = policy_mapping_fn(region_id)
-        agent_states[region_id] = trainer_obj.get_policy(
-            policy_ids[region_id]
-        ).get_initial_state()
-
-    #action offset index for tariff actions
-    tariff_offset = len(env.savings_action_nvec
-        + env.mitigation_rate_action_nvec
-        + env.export_action_nvec
-        + env.import_actions_nvec)
-    number_tariff_actions = len(env.tariff_actions_nvec)
-
-    average_tariffs = []
-
-    for timestep in range(env.episode_length):
-        for state in episode_states:
-            outputs[state][timestep] = env.global_state[state]["value"][timestep]
-
-        actions = {}
-        # TODO: Consider using the `compute_actions` (instead of `compute_action`)
-        # API below for speed-up when there are many agents.
-        for region_id in range(env.num_agents):
-            if (
-                len(agent_states[region_id]) == 0
-            ):  # stateless, with a linear model, for example
-                actions[region_id] = trainer_obj.compute_action(
-                    obs[region_id],
-                    agent_states[region_id],
-                    policy_id=policy_ids[region_id],
-                )
-            else:  # stateful
-                (
-                    actions[region_id],
-                    agent_states[region_id],
-                    _,
-                ) = trainer_obj.compute_action(
-                    obs[region_id],
-                    agent_states[region_id],
-                    policy_id=policy_ids[region_id],
-                )
-            
-            #all other regions
-            if region_id != pariah_id:
-                #heavily tariff the pariah
-                actions[region_id][tariff_offset+pariah_id] = 9
-
-                
-        #get tariffs aginst agents
-        average_pariah_tariffs = np.mean([actions[region_id][tariff_offset:tariff_offset+number_tariff_actions][pariah_id] for region_id in range(env.num_agents) if region_id !=pariah_id])
-        reward_pariah = env.get_global_state("reward_all_regions", timestep, pariah_id)
-        labor = env.get_global_state("labor_all_regions", timestep, pariah_id)
-        average_tariffs.append({
-            "pariah_tariffs":float(average_pariah_tariffs),
-            "pariah_reward":float(reward_pariah),
-            "labor":float(labor)
-        })
-
-        
-        
-        obs, _, done, _ = env_object.step(actions)
-        if done["__all__"]:
-            for state in episode_states:
-                outputs[state][timestep + 1] = env.global_state[state]["value"][
-                    timestep + 1
-                ]
-            break
-
-    outputs = {}
-
-    
-
-    
-    # Fetch the env object from the trainer
-    env_object = trainer_obj.workers.local_worker().env
-    obs = env_object.reset()
-
-    env = env_object.env
-    
-    #choose one agent to be the freerider
-    pariah_id = np.random.randint(0,env.num_agents) 
-
-    for state in episode_states:
-        assert state in env.global_state, f"{state} is not in global state!"
-        # Initialize the episode states
-        array_shape = env.global_state[state]["value"].shape
-        outputs[state] = np.nan * np.ones(array_shape)
-
-    agent_states = {}
-    policy_ids = {}
-    policy_mapping_fn = trainer_obj.config["multiagent"]["policy_mapping_fn"]
-    for region_id in range(env.num_regions):
-        policy_ids[region_id] = policy_mapping_fn(region_id)
-        agent_states[region_id] = trainer_obj.get_policy(
-            policy_ids[region_id]
-        ).get_initial_state()
-
-
-    for timestep in range(env.episode_length):
-        for state in episode_states:
-            outputs[state][timestep] = env.global_state[state]["value"][timestep]
-
-        actions = {}
-        # TODO: Consider using the `compute_actions` (instead of `compute_action`)
-        # API below for speed-up when there are many agents.
-        for region_id in range(env.num_agents):
-            if (
-                len(agent_states[region_id]) == 0
-            ):  # stateless, with a linear model, for example
-                actions[region_id] = trainer_obj.compute_action(
-                    obs[region_id],
-                    agent_states[region_id],
-                    policy_id=policy_ids[region_id],
-                )
-            else:  # stateful
-                (
-                    actions[region_id],
-                    agent_states[region_id],
-                    _,
-                ) = trainer_obj.compute_action(
-                    obs[region_id],
-                    agent_states[region_id],
-                    policy_id=policy_ids[region_id],
-                )
-
-                
-        #get tariffs aginst agents
-        average_pariah_tariffs = np.mean([actions[region_id][tariff_offset:tariff_offset+number_tariff_actions][pariah_id] for region_id in range(env.num_agents) if region_id !=pariah_id])
-        reward_pariah = env.get_global_state("reward_all_regions", timestep, pariah_id)
-        labor = env.get_global_state("labor_all_regions", timestep, pariah_id)
-        average_tariffs[timestep] = {**{
-                                        "control_tariffs":float(average_pariah_tariffs),
-                                        "control_reward":float(reward_pariah),
-                                        "labor" : float(labor)
-                                    }, **average_tariffs[timestep]}
-        
-
-
-        
-        
-        obs, _, done, _ = env_object.step(actions)
-        if done["__all__"]:
-            for state in episode_states:
-                outputs[state][timestep + 1] = env.global_state[state]["value"][
-                    timestep + 1
-                ]
-            break
-
-   
-    current_time = time.strftime("%H:%M:%S", time.localtime())
-    file_name = f"fr_{pariah_id}_{current_time}.json"
-
-    with open(os.path.join(PUBLIC_REPO_DIR,"scripts","experiments", "tariff", file_name), "w") as f:
-        json.dump(average_tariffs, f)
-
-    return outputs
 
 def fetch_episode_states_tariff(trainer_obj=None, episode_states=None):
     """
@@ -796,7 +616,7 @@ def fetch_episode_states_tariff(trainer_obj=None, episode_states=None):
                     if (
                         len(agent_states[region_id]) == 0
                     ):  # stateless, with a linear model, for example
-                        actions[region_id] = trainer_obj.compute_action(
+                        actions[region_id] = trainer_obj.compute_single_action(
                             obs[region_id],
                             agent_states[region_id],
                             policy_id=policy_ids[region_id],
@@ -806,7 +626,7 @@ def fetch_episode_states_tariff(trainer_obj=None, episode_states=None):
                             actions[region_id],
                             agent_states[region_id],
                             _,
-                        ) = trainer_obj.compute_action(
+                        ) = trainer_obj.compute_single_action(
                             obs[region_id],
                             agent_states[region_id],
                             policy_id=policy_ids[region_id],

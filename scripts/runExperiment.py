@@ -19,7 +19,7 @@ parser.add_argument(
     "--iterations",
     "-i",
     type=int,
-    default="none",
+    default=1,
     help="experiment_type",
 )
 
@@ -28,8 +28,8 @@ exp = args.exp
 iterations = args.iterations
 
 EXP = {"fr":"c393c2556b7c8df664f27286a3c63901.zip", #BasicClubDiscreteDefect FreeRider 
-        "tariff":"d630fd2ed25f1a493eca3f5e17609aaf.zip", #NoNegotiator Tariff 
-        "none":"d630fd2ed25f1a493eca3f5e17609aaf.zip"} #NoNegotiator Debugging
+        "tariff":"2023-02-17_154930.zip", #NoNegotiator Tariff
+        "none":"2023-02-17_140922.zip"} #Default for testing, basicclubdescretedefect
 
 if __name__ == "__main__":
 
@@ -37,7 +37,7 @@ if __name__ == "__main__":
         subprocess.call(
         [
             "python",
-            os.path.join(PUBLIC_REPO_DIR, "scripts", "conductExperiment.py"),
+            os.path.join(PUBLIC_REPO_DIR, "scripts", "evaluate_submission.py"),
             "-r",
             f"Submissions/{EXP[exp]}",
             "-e",
