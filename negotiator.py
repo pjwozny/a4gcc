@@ -1298,7 +1298,7 @@ class BasicClubDiscreteDefect(BaseProtocol):
 
     def get_protocol_state(self):
         protocol_state = {
-            "stage": np.array(self.stage_idx) / self.num_stages,
+            "stage": np.array([self.stage_idx]) / self.num_stages,
             "proposed_mitigation_rate": self.proposed_mitigation_rate
             / self.num_discrete_action_levels,
             "minimum_mitigation_rate_all_regions": self.minimum_mitigation_rate_all_regions
@@ -1698,7 +1698,7 @@ class BilateralNegotiator(BaseProtocol):
 
     def get_protocol_state(self):
         protocol_state = {
-            "stage": np.array(self.stage_idx) / self.num_stages,
+            "stage": np.array([self.stage_idx]) / self.num_stages,
             "promised_mitigation_rate": self.promised_mitigation_rate
             / self.num_discrete_action_levels,
             "requested_mitigation_rate": self.requested_mitigation_rate
