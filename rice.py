@@ -10,30 +10,33 @@ Regional Integrated model of Climate and the Economy (RICE)
 """
 import logging
 import os
+from pathlib import Path
 import sys
+from typing import Dict, Tuple
 import numpy as np
 from gym.spaces import MultiDiscrete
 
-import importlib
-
 from negotiator import (
+    BaseProtocol,
+    NoProtocol,
     BilateralNegotiatorWithOnlyTariff,
     BilateralNegotiatorWithTariff,
     BilateralNegotiator,
     BasicClubDiscreteDefect,
     BasicClubDiscreteDefectClusterProposals,
     BasicClub,
-    BasicClubClusterProposals
+    BasicClubClusterProposals,
 )
 
-NEGOTIATION_PROTOCOLS = {
+PROTOCOLS = {
+    "NoProtocol": NoProtocol,
     "BilateralNegotiatorWithOnlyTariff": BilateralNegotiatorWithOnlyTariff,
-    "BilateralNegotiatorWithTariff": BilateralNegotiatorWithOnlyTariff,
-    "BilateralNegotiator":BilateralNegotiator,
-    "BasicClub":BasicClub,
-    "BasicClubDiscreteDefect":BasicClubDiscreteDefect,
-    "BasicClubDiscreteDefectClusterProposals":BasicClubDiscreteDefectClusterProposals,
-    "BasicClubClusterProposals":BasicClubClusterProposals
+    "BilateralNegotiatorWithTariff": BilateralNegotiatorWithTariff,
+    "BilateralNegotiator": BilateralNegotiator,
+    "BasicClub": BasicClub,
+    "BasicClubDiscreteDefect": BasicClubDiscreteDefect,
+    "BasicClubDiscreteDefectClusterProposals": BasicClubDiscreteDefectClusterProposals,
+    "BasicClubClusterProposals": BasicClubClusterProposals,
 }
 
 
@@ -66,13 +69,11 @@ from rice_helpers import (
 )
 
 
-
 # Set logger level e.g., DEBUG, INFO, WARNING, ERROR.
 logging.getLogger().setLevel(logging.ERROR)
 
 _FEATURES = "features"
 _ACTION_MASK = "action_mask"
-
 
 
 class Rice:
@@ -88,33 +89,25 @@ class Rice:
     def __init__(
         self,
         num_discrete_action_levels=10,  # the number of discrete levels for actions, > 1
-        negotiation_on=False, # If True then negotiation is on, else off
-        negotiator_class_config={
-            "class_name":"BilateralNegotiator"
-        }
+        protocol_name="NoProtocol",
     ):
         """TODO : init docstring"""
         assert (
             num_discrete_action_levels > 1
         ), "the number of action levels should be > 1."
         self.num_discrete_action_levels = num_discrete_action_levels
-        self.negotiation_on = negotiation_on
+
+        # Set default data types
         self.float_dtype = np.float32
         self.int_dtype = np.int32
 
         # Constants
-        params, num_regions = set_rice_params(
-            os.path.join(_PUBLIC_REPO_DIR, "region_yamls"),
+        params, self.num_regions = set_rice_params(
+            Path(_PUBLIC_REPO_DIR) / "region_yamls"
         )
         # TODO : add to yaml
         self.balance_interest_rate = 0.1
 
-        #
-        # equiv. of your `import matplotlib.text as text`
-        negotiator_cls = NEGOTIATION_PROTOCOLS[negotiator_class_config["class_name"]]
-
-
-        self.num_regions = num_regions
         self.rice_constant = params["_RICE_CONSTANT"]
         self.dice_constant = params["_DICE_CONSTANT"]
         self.all_constants = self.concatenate_world_and_regional_params(
@@ -148,9 +141,6 @@ class Rice:
         # These will be initialized at reset (see below)
         self.global_state = {}
 
-        # Define the episode length
-        self.episode_length = self.dice_constant["xN"]
-
         # Defining observation and action spaces
         self.observation_space = None  # This will be set via the env_wrapper (in utils)
 
@@ -165,7 +155,7 @@ class Rice:
         # Each region sets import tariffs imposed on other countries
         self.tariff_actions_nvec = [self.num_discrete_action_levels] * self.num_regions
 
-        self.actions_nvec = (
+        self.rice_actions_nvec = (
             self.savings_action_nvec
             + self.mitigation_rate_action_nvec
             + self.export_action_nvec
@@ -173,42 +163,38 @@ class Rice:
             + self.tariff_actions_nvec
         )
 
-        # Negotiation-related initializations
-        if self.negotiation_on:
-            self.stage = 0
+        self.len_rice_actions = len(self.rice_actions_nvec)
 
-            self.negotiator = negotiator_cls(self)
+        # Initiate protocol
+        protocol_class = PROTOCOLS[protocol_name]
+        self.protocol: BaseProtocol = protocol_class(
+            self.num_regions, num_discrete_action_levels
+        )
 
-            self.num_negotiation_stages = len(self.negotiator.stages)  # proposal and evaluation steps
-            self.episode_length += (
-                self.dice_constant["xN"] * self.negotiator.num_negotiation_stages
-            )
+        # Define the episode length, 1 for the climate simulation step
+        self.episode_length = self.dice_constant["xN"] * (1 + self.protocol.num_stages)
 
-            # Each region proposes to each other region
-            # self mitigation and their mitigation values
-            self.proposal_actions_nvec = self.negotiator.stages[0]["numberActions"]
+        self.protocol_actions_nvec = []
+        for stage in self.protocol.stages:
+            self.protocol_actions_nvec += stage["action_space"]
 
-            # Each region evaluates a proposal from every other region,
-            # either accept or reject.
-            self.evaluation_actions_nvec = self.negotiator.stages[1]["numberActions"]
-
-            for action in self.negotiator.stages:
-                self.actions_nvec += action["numberActions"]
-
-
-
+        self.actions_nvec = self.rice_actions_nvec + self.protocol_actions_nvec
         # Set the env action space
         self.action_space = {
             region_id: MultiDiscrete(self.actions_nvec)
             for region_id in range(self.num_regions)
         }
 
-        # Set the default action mask (all ones)
-        self.len_actions = sum(self.actions_nvec)
-        self.default_agent_action_mask = np.ones(self.len_actions, dtype=self.int_dtype)
-
-        # Add num_agents attribute (for use with WarpDrive)
-        self.num_agents = self.num_regions
+        # Set the action mask template (immutable for safety)
+        self.action_mask_template = (
+            ("savings", sum(self.savings_action_nvec)),
+            ("mitigation", sum(self.mitigation_rate_action_nvec)),
+            ("export", sum(self.export_action_nvec)),
+            ("import", sum(self.import_actions_nvec)),
+            ("tariff", sum(self.tariff_actions_nvec)),
+            ("protocol", sum(self.protocol_actions_nvec)),
+        )
+        self.action_names = {name for name, _ in self.action_mask_template}
 
     def reset(self):
         """
@@ -221,79 +207,73 @@ class Rice:
         constants = self.all_constants
 
         self.set_global_state(
-            key="global_temperature",
-            value=np.array(
-                [constants[0]["xT_AT_0"], constants[0]["xT_LO_0"]],
-            ),
-            timestep=self.timestep,
+            "global_temperature",
+            np.array([constants[0]["xT_AT_0"], constants[0]["xT_LO_0"]]),
+            self.timestep,
             norm=1e1,
         )
 
         self.set_global_state(
-            key="global_carbon_mass",
-            value=np.array(
+            "global_carbon_mass",
+            np.array(
                 [
                     constants[0]["xM_AT_0"],
                     constants[0]["xM_UP_0"],
                     constants[0]["xM_LO_0"],
                 ],
             ),
-            timestep=self.timestep,
+            self.timestep,
             norm=1e4,
         )
 
         self.set_global_state(
-            key="capital_all_regions",
-            value=np.array(
+            "capital_all_regions",
+            np.array(
                 [constants[region_id]["xK_0"] for region_id in range(self.num_regions)]
             ),
-            timestep=self.timestep,
+            self.timestep,
             norm=1e4,
         )
 
         self.set_global_state(
-            key="labor_all_regions",
-            value=np.array(
+            "labor_all_regions",
+            np.array(
                 [constants[region_id]["xL_0"] for region_id in range(self.num_regions)]
             ),
-            timestep=self.timestep,
+            self.timestep,
             norm=1e4,
         )
 
         self.set_global_state(
-            key="production_factor_all_regions",
-            value=np.array(
+            "production_factor_all_regions",
+            np.array(
                 [constants[region_id]["xA_0"] for region_id in range(self.num_regions)]
             ),
-            timestep=self.timestep,
+            self.timestep,
             norm=1e2,
         )
 
         self.set_global_state(
-            key="intensity_all_regions",
-            value=np.array(
+            "intensity_all_regions",
+            np.array(
                 [
                     constants[region_id]["xsigma_0"]
                     for region_id in range(self.num_regions)
                 ]
             ),
-            timestep=self.timestep,
+            self.timestep,
             norm=1e-1,
         )
 
-        for key in [
-            "global_exogenous_emissions",
-            "global_land_emissions",
-        ]:
-            self.set_global_state(
-                key=key,
-                value=np.zeros(
-                    1,
-                ),
-                timestep=self.timestep,
-            )
+        for key in ["global_exogenous_emissions", "global_land_emissions"]:
+            self.set_global_state(key, np.zeros(1), self.timestep)
+
         self.set_global_state(
-            "timestep", self.timestep, self.timestep, dtype=self.int_dtype, norm=1e2
+            "timestep",
+            self.timestep,
+            self.timestep,
+            dtype=self.int_dtype,
+            norm=self.episode_length,
         )
         self.set_global_state(
             "activity_timestep",
@@ -314,13 +294,7 @@ class Rice:
             "social_welfare_all_regions",
             "reward_all_regions",
         ]:
-            self.set_global_state(
-                key=key,
-                value=np.zeros(
-                    self.num_regions,
-                ),
-                timestep=self.timestep,
-            )
+            self.set_global_state(key, np.zeros(self.num_regions), self.timestep)
 
         for key in [
             "consumption_all_regions",
@@ -330,12 +304,7 @@ class Rice:
             "production_all_regions",
         ]:
             self.set_global_state(
-                key=key,
-                value=np.zeros(
-                    self.num_regions,
-                ),
-                timestep=self.timestep,
-                norm=1e3,
+                key, np.zeros(self.num_regions), self.timestep, norm=1e3
             )
 
         for key in [
@@ -346,48 +315,35 @@ class Rice:
             "tariffed_imports",
         ]:
             self.set_global_state(
-                key=key,
-                value=np.zeros((self.num_regions, self.num_regions)),
-                timestep=self.timestep,
+                key,
+                np.zeros((self.num_regions, self.num_regions)),
+                self.timestep,
                 norm=1e2,
             )
 
-        # Negotiation-related features
-        self.set_global_state(
-            key="stage",
-            value=np.zeros(1),
-            timestep=self.timestep,
-            dtype=self.int_dtype,
-        )
-        self.set_global_state(
-            key="minimum_mitigation_rate_all_regions",
-            value=np.zeros(self.num_regions),
-            timestep=self.timestep,
-        )
-        for key in [
-            "promised_mitigation_rate",
-            "requested_mitigation_rate",
-            "proposal_decisions",
-        ]:
-            self.set_global_state(
-                key=key,
-                value=np.zeros((self.num_regions, self.num_regions)),
-                timestep=self.timestep,
-            )
+        # Protocol-related features
+        self.protocol.reset()
+        protocol_state = self.protocol.get_protocol_state()
 
-        if self.negotiation_on:
-            self.negotiator.reset()
+        for key, value in protocol_state.items():
+            self.set_global_state(key, value, self.timestep)
 
         return self.generate_observation()
 
-    def step(self, actions=None):
+    def step(self, actions: dict):
         """
         The environment step function.
         If negotiation is enabled, it also comprises
         the proposal and evaluation steps.
         """
+        assert isinstance(actions, dict)
+        assert len(actions) == self.num_regions
+
         # Increment timestep
         self.timestep += 1
+        self.set_global_state(
+            "timestep", self.timestep, self.timestep, dtype=self.int_dtype
+        )
 
         # Carry over the previous global states to the current timestep
         for key in self.global_state:
@@ -396,24 +352,30 @@ class Rice:
                     "value"
                 ][self.timestep - 1].copy()
 
-        self.set_global_state(
-            "timestep", self.timestep, self.timestep, dtype=self.int_dtype
+        # obtain separate actions dicts
+        rice_actions, protocol_actions = self.split_actions(actions)
+        protocol_done, rice_actions = self.protocol.check_do_step(
+            rice_actions, protocol_actions
         )
 
-        if self.negotiation_on:
-            # Note: The '+1` below is for the climate_and_economy_simulation_step
-            self.stage = self.timestep % (self.num_negotiation_stages + 1)
-            self.set_global_state(
-                "stage", self.stage, self.timestep, dtype=self.int_dtype
-            )
-            if self.stage != 0:
+        if not protocol_done:
+            protocol_state = self.protocol.get_protocol_state()
+            for key, value in protocol_state.items():
+                self.set_global_state(key, value, self.timestep)
+            obs = self.generate_observation()
+            rew = dict.fromkeys(range(self.num_regions), 0.0)
+            done = {"__all__": 0}
+            info = {}
+            return obs, rew, done, info
+        else:
+            return self.climate_and_economy_simulation_step(rice_actions)
 
-                return self.negotiator.stages[self.stage-1]["function"](actions)
+    def split_actions(self, actions) -> Tuple[dict, dict]:
+        rice_actions = {k: v[: self.len_rice_actions] for k, v in actions.items()}
+        protocol_actions = {k: v[self.len_rice_actions :] for k, v in actions.items()}
+        return rice_actions, protocol_actions
 
-        return self.climate_and_economy_simulation_step(actions)
-
-
-    def generate_observation(self):
+    def generate_observation(self) -> dict:
         """
         Generate observations for each agent by concatenating global, public
         and private features.
@@ -462,21 +424,13 @@ class Rice:
         # Features concerning two regions
         bilateral_features = []
 
-        # Negotiation-specific features
-        if self.negotiation_on:
-            global_features += ["stage", "proposed_mitigation_rate"]
-
-            public_features += []
-
-            private_features += [
-                "minimum_mitigation_rate_all_regions",
-            ]
-
-            bilateral_features += [
-                "promised_mitigation_rate",
-                "requested_mitigation_rate",
-                "proposal_decisions",
-            ]
+        # Protocol-specific features
+        (
+            protocol_public_features,
+            protocol_private_features,
+        ) = self.protocol.get_pub_priv_features()
+        public_features += protocol_public_features
+        private_features += protocol_private_features
 
         shared_features = np.array([])
         for feature in global_features + public_features:
@@ -505,7 +459,7 @@ class Rice:
                         self.global_state[feature]["value"][self.timestep, region_id]
                         / self.global_state[feature]["norm"]
                     ),
-                ) 
+                )
 
             for feature in bilateral_features:
                 assert self.global_state[feature]["value"].shape[1] == self.num_regions
@@ -527,167 +481,33 @@ class Rice:
 
             features_dict[region_id] = all_features
 
-        if self.negotiation_on:
-            # Fetch the action mask dictionary, keyed by region_id.
-            action_mask_dict = self.negotiator.generate_action_mask()
-        else:
-            action_mask_dict = self.generate_action_mask()
+        action_mask_dict = self.generate_action_mask()
 
         # Form the observation dictionary keyed by region id.
-        obs_dict = {}
+        obs = {}
         for region_id in range(self.num_regions):
-            obs_dict[region_id] = {
+            obs[region_id] = {
                 _FEATURES: features_dict[region_id],
                 _ACTION_MASK: action_mask_dict[region_id],
             }
 
-        return obs_dict
+        return obs
 
-    def generate_action_mask(self):
-        """
-        Generate action masks.
-        """
-        mask_dict = {region_id: None for region_id in range(self.num_regions)}
+    def generate_action_mask(self) -> Dict[int, np.ndarray]:
+        action_mask_dict = {}
+        partial_action_mask = self.protocol.get_partial_action_mask()
         for region_id in range(self.num_regions):
-            mask = self.default_agent_action_mask.copy()
-            if self.negotiation_on:
-                minimum_mitigation_rate = int(round(
-                    self.global_state["minimum_mitigation_rate_all_regions"]["value"][
-                        self.timestep, region_id
-                    ]
-                    * self.num_discrete_action_levels
-                ))
-                mitigation_mask = np.array(
-                    [0 for _ in range(minimum_mitigation_rate)]
-                    + [
-                        1
-                        for _ in range(
-                            self.num_discrete_action_levels - minimum_mitigation_rate
-                        )
-                    ]
-                )
-                mask_start = sum(self.savings_action_nvec)
-                mask_end = mask_start + sum(self.mitigation_rate_action_nvec)
-                mask[mask_start:mask_end] = mitigation_mask
-            mask_dict[region_id] = mask
+            assert set(partial_action_mask[region_id].keys()).issubset(self.action_names)
+            mask = []
+            for action_name, length in self.action_mask_template:
+                if action_name in partial_action_mask[region_id]:
+                    mask.extend(partial_action_mask[region_id][action_name])
+                else:
+                    mask.extend([1] * length)
 
-        return mask_dict
+            action_mask_dict[region_id] = np.array(mask, dtype=self.int_dtype)
 
-    def proposal_step(self, actions=None):
-        """
-        Update Proposal States and Observations using proposal actions
-        Update Stage to 1 - Evaluation
-        """
-        assert self.negotiation_on
-        assert self.stage == 1
-
-        assert isinstance(actions, dict)
-        assert len(actions) == self.num_regions
-
-        action_offset_index = len(
-            self.savings_action_nvec
-            + self.mitigation_rate_action_nvec
-            + self.export_action_nvec
-            + self.import_actions_nvec
-            + self.tariff_actions_nvec
-        )
-        num_proposal_actions = len(self.proposal_actions_nvec)
-
-        m1_all_regions = [
-            actions[region_id][
-                action_offset_index : action_offset_index + num_proposal_actions : 2
-            ]
-            / self.num_discrete_action_levels
-            for region_id in range(self.num_regions)
-        ]
-
-        m2_all_regions = [
-            actions[region_id][
-                action_offset_index + 1 : action_offset_index + num_proposal_actions : 2
-            ]
-            / self.num_discrete_action_levels
-            for region_id in range(self.num_regions)
-        ]
-
-        self.set_global_state(
-            "promised_mitigation_rate", np.array(m1_all_regions), self.timestep
-        )
-        self.set_global_state(
-            "requested_mitigation_rate", np.array(m2_all_regions), self.timestep
-        )
-
-        obs = self.generate_observation()
-        rew = {region_id: 0.0 for region_id in range(self.num_regions)}
-        done = {"__all__": 0}
-        info = {}
-        return obs, rew, done, info
-
-    def evaluation_step(self, actions=None):
-        """
-        Update minimum mitigation rates
-        """
-        assert self.negotiation_on 
-        
-        assert self.stage == 2
-
-        assert isinstance(actions, dict)
-        assert len(actions) == self.num_regions
-
-        action_offset_index = len(
-            self.savings_action_nvec
-            + self.mitigation_rate_action_nvec
-            + self.export_action_nvec
-            + self.import_actions_nvec
-            + self.tariff_actions_nvec
-            + self.proposal_actions_nvec
-        )
-        num_evaluation_actions = len(self.evaluation_actions_nvec)
-
-        proposal_decisions = np.array(
-            [
-                actions[region_id][
-                    action_offset_index : action_offset_index + num_evaluation_actions
-                ]
-                for region_id in range(self.num_regions)
-            ]
-        )
-        # Force set the evaluation for own proposal to reject
-        for region_id in range(self.num_regions):
-            proposal_decisions[region_id, region_id] = 0
-
-        self.set_global_state("proposal_decisions", proposal_decisions, self.timestep)
-
-        for region_id in range(self.num_regions):
-            outgoing_accepted_mitigation_rates = [
-                self.global_state["promised_mitigation_rate"]["value"][
-                    self.timestep, region_id, j
-                ]
-                * self.global_state["proposal_decisions"]["value"][
-                    self.timestep, j, region_id
-                ]
-                for j in range(self.num_regions)
-            ]
-            incoming_accepted_mitigation_rates = [
-                self.global_state["requested_mitigation_rate"]["value"][
-                    self.timestep, j, region_id
-                ]
-                * self.global_state["proposal_decisions"]["value"][
-                    self.timestep, region_id, j
-                ]
-                for j in range(self.num_regions)
-            ]
-
-            self.global_state["minimum_mitigation_rate_all_regions"]["value"][
-                self.timestep, region_id
-            ] = max(
-                outgoing_accepted_mitigation_rates + incoming_accepted_mitigation_rates
-            )
-
-        obs = self.generate_observation()
-        rew = {region_id: 0.0 for region_id in range(self.num_regions)}
-        done = {"__all__": 0}
-        info = {}
-        return obs, rew, done, info
+        return action_mask_dict
 
     def climate_and_economy_simulation_step(self, actions=None):
         """
@@ -704,10 +524,7 @@ class Rice:
             dtype=self.int_dtype,
         )
 
-        if self.negotiation_on:
-            assert self.stage == 0
-        else:
-            assert self.timestep == self.activity_timestep
+        assert self.protocol.stage_idx == 0
 
         assert isinstance(actions, dict)
         assert len(actions) == self.num_regions
@@ -1211,7 +1028,7 @@ class Rice:
         return obs, rew, done, info
 
     def set_global_state(
-        self, key=None, value=None, timestep=None, norm=None, region_id=None, dtype=None
+        self, key, value, timestep=None, norm=1.0, region_id=None, dtype=None
     ):
         """
         Set a specific slice of the environment global state with a key and value pair.
