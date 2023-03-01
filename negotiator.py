@@ -1878,7 +1878,7 @@ class BilateralNegotiator(BaseProtocol):
         return protocol_state
 
     def get_pub_priv_features(self):
-        public_features = ["stage"]
+        public_features = ["stage", "minimum_mitigation_rate_all_regions"]
         private_features = [
             # "promised_mitigation_rate",
             # "requested_mitigation_rate",
@@ -1886,7 +1886,6 @@ class BilateralNegotiator(BaseProtocol):
             "received_promised_mitigation_rate",
             "received_requested_mitigation_rate",
             "received_proposal_decisions",
-            "minimum_mitigation_rate_all_regions",
         ]
         return public_features, private_features
 
