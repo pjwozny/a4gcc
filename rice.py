@@ -194,6 +194,7 @@ class Rice:
             ("tariff", sum(self.tariff_actions_nvec)),
             ("protocol", sum(self.protocol_actions_nvec)),
         )
+        self.action_names = {name for name, _ in self.action_mask_template}
 
     def reset(self):
         """
@@ -496,6 +497,7 @@ class Rice:
         action_mask_dict = {}
         partial_action_mask = self.protocol.get_partial_action_mask()
         for region_id in range(self.num_regions):
+            assert set(partial_action_mask[region_id].keys()).issubset(self.action_names)
             mask = []
             for action_name, length in self.action_mask_template:
                 if action_name in partial_action_mask[region_id]:
