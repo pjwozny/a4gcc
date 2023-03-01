@@ -222,79 +222,73 @@ class Rice:
         constants = self.all_constants
 
         self.set_global_state(
-            key="global_temperature",
-            value=np.array(
-                [constants[0]["xT_AT_0"], constants[0]["xT_LO_0"]],
-            ),
-            timestep=self.timestep,
+            "global_temperature",
+            np.array([constants[0]["xT_AT_0"], constants[0]["xT_LO_0"]]),
+            self.timestep,
             norm=1e1,
         )
 
         self.set_global_state(
-            key="global_carbon_mass",
-            value=np.array(
+            "global_carbon_mass",
+            np.array(
                 [
                     constants[0]["xM_AT_0"],
                     constants[0]["xM_UP_0"],
                     constants[0]["xM_LO_0"],
                 ],
             ),
-            timestep=self.timestep,
+            self.timestep,
             norm=1e4,
         )
 
         self.set_global_state(
-            key="capital_all_regions",
-            value=np.array(
+            "capital_all_regions",
+            np.array(
                 [constants[region_id]["xK_0"] for region_id in range(self.num_regions)]
             ),
-            timestep=self.timestep,
+            self.timestep,
             norm=1e4,
         )
 
         self.set_global_state(
-            key="labor_all_regions",
-            value=np.array(
+            "labor_all_regions",
+            np.array(
                 [constants[region_id]["xL_0"] for region_id in range(self.num_regions)]
             ),
-            timestep=self.timestep,
+            self.timestep,
             norm=1e4,
         )
 
         self.set_global_state(
-            key="production_factor_all_regions",
-            value=np.array(
+            "production_factor_all_regions",
+            np.array(
                 [constants[region_id]["xA_0"] for region_id in range(self.num_regions)]
             ),
-            timestep=self.timestep,
+            self.timestep,
             norm=1e2,
         )
 
         self.set_global_state(
-            key="intensity_all_regions",
-            value=np.array(
+            "intensity_all_regions",
+            np.array(
                 [
                     constants[region_id]["xsigma_0"]
                     for region_id in range(self.num_regions)
                 ]
             ),
-            timestep=self.timestep,
+            self.timestep,
             norm=1e-1,
         )
 
-        for key in [
-            "global_exogenous_emissions",
-            "global_land_emissions",
-        ]:
-            self.set_global_state(
-                key=key,
-                value=np.zeros(
-                    1,
-                ),
-                timestep=self.timestep,
-            )
+        for key in ["global_exogenous_emissions", "global_land_emissions"]:
+            self.set_global_state(key, np.zeros(1), self.timestep)
+
         self.set_global_state(
-            "timestep", self.timestep, self.timestep, dtype=self.int_dtype, norm=1e2
+            "timestep",
+            self.timestep,
+            self.timestep,
+            dtype=self.int_dtype,
+            norm=self.episode_length,
         )
         self.set_global_state(
             "activity_timestep",
@@ -315,13 +309,7 @@ class Rice:
             "social_welfare_all_regions",
             "reward_all_regions",
         ]:
-            self.set_global_state(
-                key=key,
-                value=np.zeros(
-                    self.num_regions,
-                ),
-                timestep=self.timestep,
-            )
+            self.set_global_state(key, np.zeros(self.num_regions), self.timestep)
 
         for key in [
             "consumption_all_regions",
@@ -331,12 +319,7 @@ class Rice:
             "production_all_regions",
         ]:
             self.set_global_state(
-                key=key,
-                value=np.zeros(
-                    self.num_regions,
-                ),
-                timestep=self.timestep,
-                norm=1e3,
+                key, np.zeros(self.num_regions), self.timestep, norm=1e3
             )
 
         for key in [
@@ -347,9 +330,9 @@ class Rice:
             "tariffed_imports",
         ]:
             self.set_global_state(
-                key=key,
-                value=np.zeros((self.num_regions, self.num_regions)),
-                timestep=self.timestep,
+                key,
+                np.zeros((self.num_regions, self.num_regions)),
+                self.timestep,
                 norm=1e2,
             )
 
@@ -1098,7 +1081,7 @@ class Rice:
         return obs, rew, done, info
 
     def set_global_state(
-        self, key=None, value=None, timestep=None, norm=None, region_id=None, dtype=None
+        self, key, value, timestep=None, norm=1.0, region_id=None, dtype=None
     ):
         """
         Set a specific slice of the environment global state with a key and value pair.
