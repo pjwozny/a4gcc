@@ -41,10 +41,7 @@ logging:
 # Environment configuration
 env:
     num_discrete_action_levels: 10 # number of discrete levels for the saving and mitigation actions
-    negotiation_on: True # flag to indicate whether negotiation is allowed or not
-    negotiator_class_config:
-        file_name: "negotiator"
-        class_name: "BilateralNegotiatorWithOnlyTariff"
+    protocol_name: "BasicClubDiscreteDefect"
 
 # Policy network settings
 policy:
