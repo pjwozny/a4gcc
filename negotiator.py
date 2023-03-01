@@ -61,6 +61,13 @@ class BaseProtocol(ABC):
         return [], []
 
 
+class NoProtocol(BaseProtocol):
+    def __init__(self, num_regions, num_discrete_action_levels) -> None:
+        self.stages = []
+        super().__init__(num_regions, num_discrete_action_levels)
+
+
+class BilateralNegotiatorWithOnlyTariff(BaseNegotiator):
 
     """
     Updated Bi-lateral negotiation included as the original with the following added:
