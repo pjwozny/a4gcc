@@ -67,7 +67,7 @@ class NoProtocol(BaseProtocol):
         super().__init__(num_regions, num_discrete_action_levels)
 
 
-class BilateralNegotiatorWithOnlyTariff(BaseNegotiator):
+class BilateralNegotiatorWithOnlyTariff(BaseProtocol):
 
     """
     Updated Bi-lateral negotiation included as the original with the following added:
@@ -316,7 +316,7 @@ class BilateralNegotiatorWithOnlyTariff(BaseNegotiator):
         return mask_dict
 
 
-class BilateralNegotiatorWithTariff(BaseNegotiator):
+class BilateralNegotiatorWithTariff(BaseProtocol):
 
     """
     Updated Bi-lateral negotiation included as the original with the following added:
@@ -583,7 +583,7 @@ class BilateralNegotiatorWithTariff(BaseNegotiator):
 
         return mask_dict
 
-class BasicClubDiscreteDefectClusterProposals(BaseNegotiator):
+class BasicClubDiscreteDefectClusterProposals(BaseProtocol):
 
     """
     Basic Climate Club. Works as follows:
@@ -942,7 +942,7 @@ class BasicClubDiscreteDefectClusterProposals(BaseNegotiator):
 
         return mask_dict
 
-class BasicClubClusterProposals(BaseNegotiator):
+class BasicClubClusterProposals(BaseProtocol):
 
     """
     Basic Climate Club. Works as follows:
@@ -1240,7 +1240,7 @@ class BasicClubClusterProposals(BaseNegotiator):
 
         return mask_dict
 
-class BasicClubDiscreteDefect(BaseNegotiator):
+class BasicClubDiscreteDefect(BaseProtocol):
 
     """
     Basic Climate Club. Works as follows:
