@@ -1825,7 +1825,7 @@ class BasicClub(BaseNegotiator):
         return mask_dict
 
 
-class BilateralNegotiator(BaseNegotiator):
+class BilateralNegotiator(BaseProtocol):
 
     """
     Basic Bi-lateral negotiation included as the original
@@ -1840,176 +1840,112 @@ class BilateralNegotiator(BaseNegotiator):
 
     """
 
-    def __init__(self, rice):
-        """
-        Defines necessary parameters for communication
-        with rice class
-
-        Args:
-            Rice: instance of RICE-N model
-        """
-        self.rice = rice
+    def __init__(self, num_regions, num_discrete_action_levels):
         self.stages = [
             {
                 "function": self.proposal_step,
-                "numberActions": (
-                    [self.rice.num_discrete_action_levels] * 2 * self.rice.num_regions
-                ),
+                "action_space": ([num_discrete_action_levels] * 2 * num_regions),
             },
             {
                 "function": self.evaluation_step,
-                "numberActions": [2] * self.rice.num_regions,
+                "action_space": [2] * num_regions,
             },
         ]
-        self.num_negotiation_stages = len(self.stages)
+        super().__init__(num_regions, num_discrete_action_levels)
 
-    def proposal_step(self, actions=None):
+    def reset(self):
+        self.promised_mitigation_rate = np.zeros((self.num_regions, self.num_regions))
+        self.requested_mitigation_rate = np.zeros((self.num_regions, self.num_regions))
+        self.proposal_decisions = np.zeros((self.num_regions, self.num_regions))
+        self.minimum_mitigation_rate_all_regions = np.zeros(self.num_regions)
+
+    def get_protocol_state(self):
+        protocol_state = {
+            "stage": np.array(self.stage_idx) / self.num_stages,
+            "promised_mitigation_rate": self.promised_mitigation_rate
+            / self.num_discrete_action_levels,
+            "requested_mitigation_rate": self.requested_mitigation_rate
+            / self.num_discrete_action_levels,
+            "proposal_decisions": self.proposal_decisions
+            / self.num_discrete_action_levels,
+            "received_promised_mitigation_rate": self.promised_mitigation_rate.T
+            / self.num_discrete_action_levels,
+            "received_requested_mitigation_rate": self.requested_mitigation_rate.T
+            / self.num_discrete_action_levels,
+            "received_proposal_decisions": self.proposal_decisions.T
+            / self.num_discrete_action_levels,
+            "minimum_mitigation_rate_all_regions": self.minimum_mitigation_rate_all_regions
+            / self.num_discrete_action_levels,
+        }
+        return protocol_state
+
+    def get_pub_priv_features(self):
+        public_features = ["stage"]
+        private_features = [
+            # "promised_mitigation_rate",
+            # "requested_mitigation_rate",
+            # "proposal_decisions",
+            "received_promised_mitigation_rate",
+            "received_requested_mitigation_rate",
+            "received_proposal_decisions",
+            "minimum_mitigation_rate_all_regions",
+        ]
+        return public_features, private_features
+
+    def proposal_step(self, actions: dict) -> dict:
         """
         Update Proposal States and Observations using proposal actions
         Update Stage to 1 - Evaluation
         """
-        assert self.rice.negotiation_on
-        assert self.rice.stage == 1
-
+        assert self.stage_idx == 0
         assert isinstance(actions, dict)
-        assert len(actions) == self.rice.num_regions
+        assert len(actions) == self.num_regions
 
-        action_offset_index = len(
-            self.rice.savings_action_nvec
-            + self.rice.mitigation_rate_action_nvec
-            + self.rice.export_action_nvec
-            + self.rice.import_actions_nvec
-            + self.rice.tariff_actions_nvec
-        )
-        num_proposal_actions = len(self.stages[0]["numberActions"])
-
-        m1_all_regions = [
-            actions[region_id][
-                action_offset_index : action_offset_index + num_proposal_actions : 2
-            ]
-            / self.rice.num_discrete_action_levels
-            for region_id in range(self.rice.num_regions)
-        ]
-
-        m2_all_regions = [
-            actions[region_id][
-                action_offset_index + 1 : action_offset_index + num_proposal_actions : 2
-            ]
-            / self.rice.num_discrete_action_levels
-            for region_id in range(self.rice.num_regions)
-        ]
-
-        self.rice.set_global_state(
-            "promised_mitigation_rate", np.array(m1_all_regions), self.rice.timestep
-        )
-        self.rice.set_global_state(
-            "requested_mitigation_rate", np.array(m2_all_regions), self.rice.timestep
+        self.promised_mitigation_rate = np.array(
+            [actions[region_id][0::2] for region_id in range(self.num_regions)]
         )
 
-        obs = self.rice.generate_observation()
-        rew = {region_id: 0.0 for region_id in range(self.rice.num_regions)}
-        done = {"__all__": 0}
-        info = {}
-        return obs, rew, done, info
+        self.requested_mitigation_rate = np.array(
+            [actions[region_id][1::2] for region_id in range(self.num_regions)]
+        )
 
-    def evaluation_step(self, actions=None):
+    def evaluation_step(self, actions):
         """
         Update minimum mitigation rates
         """
-        assert self.rice.negotiation_on
-
-        assert self.rice.stage == 2
-
+        assert self.stage_idx == 1
         assert isinstance(actions, dict)
-        assert len(actions) == self.rice.num_regions
+        assert len(actions) == self.num_regions
 
-        action_offset_index = len(
-            self.rice.savings_action_nvec
-            + self.rice.mitigation_rate_action_nvec
-            + self.rice.export_action_nvec
-            + self.rice.import_actions_nvec
-            + self.rice.tariff_actions_nvec
-            + self.rice.proposal_actions_nvec
+        self.proposal_decisions = np.array(
+            [actions[region_id] for region_id in range(self.num_regions)]
         )
-        num_evaluation_actions = len(self.stages[1]["numberActions"])
 
-        proposal_decisions = np.array(
-            [
-                actions[region_id][
-                    action_offset_index : action_offset_index + num_evaluation_actions
-                ]
-                for region_id in range(self.rice.num_regions)
-            ]
-        )
         # Force set the evaluation for own proposal to reject
-        for region_id in range(self.rice.num_regions):
-            proposal_decisions[region_id, region_id] = 0
+        for region_id in range(self.num_regions):
+            self.proposal_decisions[region_id, region_id] = 0
 
-        self.rice.set_global_state(
-            "proposal_decisions", proposal_decisions, self.rice.timestep
-        )
+        # outgoing accepted mitigation rates
+        oamr = self.promised_mitigation_rate * self.proposal_decisions.T
+        # incoming accepted mitigation rates
+        iamr = self.requested_mitigation_rate.T * self.proposal_decisions
+        # minimum mitigation rate all regions
+        mmral = np.concatenate((oamr, iamr), axis=1).max(axis=1)
 
-        for region_id in range(self.rice.num_regions):
-            outgoing_accepted_mitigation_rates = [
-                self.rice.global_state["promised_mitigation_rate"]["value"][
-                    self.rice.timestep, region_id, j
-                ]
-                * self.rice.global_state["proposal_decisions"]["value"][
-                    self.rice.timestep, j, region_id
-                ]
-                for j in range(self.rice.num_regions)
-            ]
-            incoming_accepted_mitigation_rates = [
-                self.rice.global_state["requested_mitigation_rate"]["value"][
-                    self.rice.timestep, j, region_id
-                ]
-                * self.rice.global_state["proposal_decisions"]["value"][
-                    self.rice.timestep, region_id, j
-                ]
-                for j in range(self.rice.num_regions)
-            ]
+        self.minimum_mitigation_rate_all_regions = mmral
 
-            self.rice.global_state["minimum_mitigation_rate_all_regions"]["value"][
-                self.rice.timestep, region_id
-            ] = max(
-                outgoing_accepted_mitigation_rates + incoming_accepted_mitigation_rates
-            )
-
-        obs = self.rice.generate_observation()
-        rew = {region_id: 0.0 for region_id in range(self.rice.num_regions)}
-        done = {"__all__": 0}
-        info = {}
-        return obs, rew, done, info
-
-    def generate_action_mask(self):
+    def get_partial_action_mask(self):
         """
         Generate action masks.
         """
-        mask_dict = {region_id: None for region_id in range(self.rice.num_regions)}
-        for region_id in range(self.rice.num_regions):
-            mask = self.rice.default_agent_action_mask.copy()
-            if self.rice.negotiation_on:
-                minimum_mitigation_rate = int(
-                    round(
-                        self.rice.global_state["minimum_mitigation_rate_all_regions"][
-                            "value"
-                        ][self.rice.timestep, region_id]
-                        * self.rice.num_discrete_action_levels
-                    )
-                )
-                mitigation_mask = np.array(
-                    [0 for _ in range(minimum_mitigation_rate)]
-                    + [
-                        1
-                        for _ in range(
-                            self.rice.num_discrete_action_levels
-                            - minimum_mitigation_rate
-                        )
-                    ]
-                )
-                mask_start = sum(self.rice.savings_action_nvec)
-                mask_end = mask_start + sum(self.rice.mitigation_rate_action_nvec)
-                mask[mask_start:mask_end] = mitigation_mask
-            mask_dict[region_id] = mask
+        action_mask_dict = defaultdict(dict)
+        for region_id in range(self.num_regions):
+            minimum_mitigation_rate = self.minimum_mitigation_rate_all_regions[
+                region_id
+            ]
+            mitigation_mask = [0] * int(minimum_mitigation_rate) + [1] * int(
+                self.num_discrete_action_levels - minimum_mitigation_rate
+            )
+            action_mask_dict[region_id]["mitigation"] = mitigation_mask
 
-        return mask_dict
+        return action_mask_dict
