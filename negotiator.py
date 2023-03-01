@@ -1930,9 +1930,9 @@ class BilateralNegotiator(BaseProtocol):
         # incoming accepted mitigation rates
         iamr = self.requested_mitigation_rate.T * self.proposal_decisions
         # minimum mitigation rate all regions
-        mmral = np.concatenate((oamr, iamr), axis=1).max(axis=1)
+        mmrar = np.concatenate((oamr, iamr), axis=1).max(axis=1)
 
-        self.minimum_mitigation_rate_all_regions = mmral
+        self.minimum_mitigation_rate_all_regions = mmrar
 
     def get_partial_action_mask(self):
         """
