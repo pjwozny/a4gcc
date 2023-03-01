@@ -10,6 +10,7 @@ Regional Integrated model of Climate and the Economy (RICE)
 """
 import logging
 import os
+from pathlib import Path
 import sys
 import numpy as np
 from gym.spaces import MultiDiscrete
@@ -104,7 +105,7 @@ class Rice:
 
         # Constants
         params, num_regions = set_rice_params(
-            os.path.join(_PUBLIC_REPO_DIR, "region_yamls"),
+            Path(_PUBLIC_REPO_DIR) / "region_yamls"
         )
         # TODO : add to yaml
         self.balance_interest_rate = 0.1
