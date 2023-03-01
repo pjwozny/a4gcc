@@ -1898,8 +1898,6 @@ class BilateralNegotiator(BaseProtocol):
         Update Stage to 1 - Evaluation
         """
         assert self.stage_idx == 0
-        assert isinstance(actions, dict)
-        assert len(actions) == self.num_regions
 
         self.promised_mitigation_rate = np.array(
             [actions[region_id][0::2] for region_id in range(self.num_regions)]
@@ -1914,8 +1912,6 @@ class BilateralNegotiator(BaseProtocol):
         Update minimum mitigation rates
         """
         assert self.stage_idx == 1
-        assert isinstance(actions, dict)
-        assert len(actions) == self.num_regions
 
         self.proposal_decisions = np.array(
             [actions[region_id] for region_id in range(self.num_regions)]

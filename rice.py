@@ -329,12 +329,15 @@ class Rice:
 
         return self.generate_observation()
 
-    def step(self, actions):
+    def step(self, actions: dict):
         """
         The environment step function.
         If negotiation is enabled, it also comprises
         the proposal and evaluation steps.
         """
+        assert isinstance(actions, dict)
+        assert len(actions) == self.num_regions
+
         # Increment timestep
         self.timestep += 1
         self.set_global_state(
