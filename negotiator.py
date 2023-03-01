@@ -1,21 +1,66 @@
 from abc import ABC, abstractmethod
+from collections import defaultdict
+from typing import Dict, Tuple
 
 import numpy as np
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
 
 
-class BaseNegotiator(ABC):
-
+class BaseProtocol(ABC):
     @abstractmethod
-    def __init__(self) -> None:
-        pass
+    def __init__(self, num_regions: int, num_discrete_action_levels: int) -> None:
+        self.num_regions: int = num_regions
+        self.num_discrete_action_levels: int = num_discrete_action_levels
+
+        self.stage_idx = 0
+        self.done = False
+
+        if not hasattr(self, "stages"):
+            raise NotImplementedError("stages attribute has not been set")
+
+        action_lengths = [len(s["action_space"]) for s in self.stages]
+        self.action_offsets = {i: o for i, o in enumerate(np.cumsum(action_lengths))}
+        self.num_stages = len(self.stages)
+
+    def check_do_step(self, rice_actions, protocol_actions) -> Tuple[bool, dict]:
+        if self.stage_idx == self.num_stages:
+            self.stage_idx = 0
+            return True, rice_actions
+
+        stage_actions = self.split_actions(protocol_actions)
+        self.stages[self.stage_idx]["function"](stage_actions)
+        self.stage_idx += 1
+
+        return False, rice_actions
+
+    def split_actions(self, actions) -> Dict[int, np.ndarray]:
+        end_idx = self.action_offsets[self.stage_idx]
+        if self.stage_idx == 0:
+            return {k: v[0:end_idx] for k, v in actions.items()}
+
+        start_idx = self.action_offsets[self.stage_idx - 1]
+        return {k: v[start_idx:end_idx] for k, v in actions.items()}
+
+    def check_done_restart(self) -> bool:
+        if self.stage_idx == self.num_stages:
+            self.stage_idx = 0
+            return True
+        return False
+
+    def get_partial_action_mask(self) -> Dict[int, Dict[str, list]]:
+        return defaultdict(dict)
 
     def reset(self) -> None:
         pass
 
+    def get_protocol_state(self) -> Dict[str, np.ndarray]:
+        return {}
 
-class BilateralNegotiatorWithOnlyTariff(BaseNegotiator):
+    def get_pub_priv_features(selft) -> Tuple[list, list]:
+        return [], []
+
+
 
     """
     Updated Bi-lateral negotiation included as the original with the following added:
