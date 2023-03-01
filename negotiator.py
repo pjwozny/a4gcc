@@ -1866,14 +1866,12 @@ class BilateralNegotiator(BaseProtocol):
             / self.num_discrete_action_levels,
             "requested_mitigation_rate": self.requested_mitigation_rate
             / self.num_discrete_action_levels,
-            "proposal_decisions": self.proposal_decisions
-            / self.num_discrete_action_levels,
+            "proposal_decisions": self.proposal_decisions,
             "received_promised_mitigation_rate": self.promised_mitigation_rate.T
             / self.num_discrete_action_levels,
             "received_requested_mitigation_rate": self.requested_mitigation_rate.T
             / self.num_discrete_action_levels,
-            "received_proposal_decisions": self.proposal_decisions.T
-            / self.num_discrete_action_levels,
+            "received_proposal_decisions": self.proposal_decisions.T,
             "minimum_mitigation_rate_all_regions": self.minimum_mitigation_rate_all_regions
             / self.num_discrete_action_levels,
         }
