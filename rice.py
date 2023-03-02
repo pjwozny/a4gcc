@@ -105,6 +105,10 @@ class Rice:
         params, self.num_regions = set_rice_params(
             Path(_PUBLIC_REPO_DIR) / "region_yamls"
         )
+
+        # must be set for AI4GCC unittests
+        self.num_agents = self.num_regions
+        
         # TODO : add to yaml
         self.balance_interest_rate = 0.1
 
