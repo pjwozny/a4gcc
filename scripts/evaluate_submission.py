@@ -40,54 +40,6 @@ from collections import Counter
 import matplotlib.pyplot as plt
 import pandas as pd
 
-def constructStackedBarChart(global_states, 
-                            num_discrete_actions = 10, 
-                            field = "minimum_mitigation_rate_all_regions"):
-
-    """
-    Constructs a Stacked Bar Chart for each timestep of a given run
-    Note: this is only useful where there is a single value per country, 
-        ie self-directed country actions, such as mitigation. 
-
-    Args:
-        global_state(dict): the global state dictionary of a completed run
-        field(str): the name of the field to extract, defualt is minimum_mitigation_rates
-        wandb(wandb-object): an already initialized and open wandb object
-                indicating where the plot should be sent
-    """
-
-
-    rates_over_time = global_states[field]
-    possible_rates = range(0,num_discrete_actions-1)
-    to_plot = {rate:[] for rate in possible_rates}
-
-    #per timestep get rate counts
-    for timestep in range(rates_over_time.shape[0]):
-        current_rates = rates_over_time[timestep,:]
-        current_counter = Counter(current_rates)
-        for rate in possible_rates:
-            #count countries with a particular rate
-            if rate in current_counter.keys():
-                to_plot[rate].append(current_counter[rate])
-            #if no countries have that particular rate
-            else:
-                to_plot[rate].append(0)
-
-    pdf = pd.DataFrame(to_plot)
-    pdf.plot(kind='bar', stacked=True).legend(loc='center left',bbox_to_anchor=(1.0, 0.5))
-    plt.xlabel(f"Countries of a Given {field}")
-    plt.ylabel("Timesteps")
-    plt.title(f"{field} Distribution")
-    plt.show()
-    # wandb.log({f"{field}":plt})
-
-        
-
-
-
-
-
-
 # Set logger level e.g., DEBUG, INFO, WARNING, ERROR.
 logging.getLogger().setLevel(logging.ERROR)
 
