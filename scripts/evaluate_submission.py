@@ -23,6 +23,7 @@ import wandb
 import yaml
 import pickle as pkl
 from pathlib import Path
+from visualizeOutputs import construct_stacked_bar_chart
 
 _path = Path(os.path.abspath(__file__))
 
@@ -289,12 +290,12 @@ def compute_metrics(fetch_episode_states, trainer, framework, submission_file, e
             pkl.dump(episode_states[0], f, protocol=pkl.HIGHEST_PROTOCOL)
         
         #log mitigation rate counts of each country over time
-        constructStackedBarChart(episode_states[0],wandb,
-                                    field="mitigation_rate_all_regions")
+        wandb.log({"mitigation_rate Counts Across Time":construct_stacked_bar_chart(episode_states[0],
+                                    field="mitigation_rate_all_regions")})
 
-        #log minimum mitigation rate counts of each country over time
-        constructStackedBarChart(episode_states[0], wandb,
-                                    field="minimum_mitigation_rate_all_regions")
+         #log mitigation rate counts of each country over time
+        wandb.log({"minimum_mitigation_rate Counts Across Time":construct_stacked_bar_chart(episode_states[0],
+                                    field="minimum_mitigation_rate_all_regions")})
 
         for feature in desired_outputs:
             feature_values = [None for _ in range(num_episodes)]
