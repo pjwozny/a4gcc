@@ -6,7 +6,7 @@ import pandas as pd
 import os
 from fixed_paths import PUBLIC_REPO_DIR
 
-def constructStackedBarChart(global_states, wandb,
+def construct_stacked_bar_chart(global_states, wandb,
                             num_discrete_actions = 10, 
                             field = "mitigation_rate_all_regions"):
 
