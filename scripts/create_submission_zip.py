@@ -14,8 +14,21 @@ import shutil
 from argparse import ArgumentParser
 from pathlib import Path
 
-from scripts.evaluate_submission import get_results_dir, validate_dir
+import yaml
 
+BACKWARDS_COMPAT_CONFIG = """
+trainer:
+    num_envs: 1 # number of environment replicas
+    rollout_fragment_length: 100 # divide episodes into fragments of this many steps each during rollouts.
+    train_batch_size: 2000 # total batch size used for training per iteration (across all the environments)
+    num_episodes: 100 # number of episodes to run the training for
+    framework: torch # framework setting.
+    # Note: RLlib supports TF as well, but our end-to-end pipeline is built for Pytorch only.
+    # === Hardware Settings ===
+    num_workers: 1 # number of rollout worker actors to create for parallel sampling.
+    # Note: Setting the num_workers to 0 will force rollouts to be done in the trainer actor.
+    num_gpus: 0 # number of GPUs to allocate to the trainer process. This can also be fractional (e.g., 0.3 GPUs).
+"""
 
 
 def prepare_submission(results_dir: Path) -> Path:
@@ -53,6 +66,27 @@ def prepare_submission(results_dir: Path) -> Path:
     submission_file = Path("submissions") / results_dir.name
     shutil.make_archive(submission_file, "zip", results_dir_copy)
     print("NOTE: The submission file is created at:\t\t\t", submission_file.with_suffix(".zip"))
+
+    # open rice config yaml file in copied directory
+    config_path = results_dir_copy / "rice_rllib.yaml"
+    with open(config_path, "r", encoding="utf8") as fp:
+        run_config = yaml.safe_load(fp)
+
+    # modify the rice_config yaml to work with the original code
+    backwards_config = yaml.safe_load(BACKWARDS_COMPAT_CONFIG)
+    run_config["trainer"] = backwards_config["trainer"]
+    del run_config["logging"]
+
+    # write rice_config yaml file to tmp directory
+    with open(config_path, "w", encoding="utf8") as fp:
+        yaml.dump(run_config, fp, default_flow_style=False)
+
+    # Create the backwards compatible submission file and delete the temporary copy
+    submission_file = Path("submissions") / "backwards_compatible" / results_dir.name
+    shutil.make_archive(submission_file, "zip", results_dir_copy)
+    print("NOTE: The backwards compatible submission file is created at:\t", submission_file.with_suffix(".zip"))
+    
+    # delete temporary directory
     shutil.rmtree(results_dir_copy)
 
     return submission_file.with_suffix(".zip")
