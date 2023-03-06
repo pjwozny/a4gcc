@@ -24,6 +24,7 @@ import yaml
 import pickle as pkl
 from pathlib import Path
 from visualizeOutputs import construct_stacked_bar_chart
+from create_submission_zip import prepare_submission, validate_dir
 
 _path = Path(os.path.abspath(__file__))
 
@@ -37,9 +38,6 @@ print("Using _PRIVATE_REPO_DIR = {}".format(_PRIVATE_REPO_DIR))
 
 import pickle as pkl
 import numpy as np
-from collections import Counter
-import matplotlib.pyplot as plt
-import pandas as pd
 
 # Set logger level e.g., DEBUG, INFO, WARNING, ERROR.
 logging.getLogger().setLevel(logging.ERROR)
@@ -171,89 +169,7 @@ def get_results_dir():
         raise ValueError("Cannot obtain the results directory") from err
 
 
-def validate_dir(results_dir=None):
-    """
-    Validate that all the required files are present in the 'results' directory.
-    """
-    assert results_dir is not None
-    framework = None
-
-    files = os.listdir(results_dir)
-    if ".warpdrive" in files:
-        framework = "warpdrive"
-        # Warpdrive was used for training
-        for file in [
-            "rice.py",
-            "rice_helpers.py",
-            "rice_cuda.py",
-            "rice_step.cu",
-            "rice_warpdrive.yaml",
-        ]:
-            if file not in files:
-                success = False
-                logging.error(
-                    "%s is not present in the results directory: %s!", file, results_dir
-                )
-                comment = f"{file} is not present in the results directory!"
-                break
-            success = True
-            comment = "Valid submission"
-    elif ".rllib" in files:
-        framework = "rllib"
-        # RLlib was used for training
-        for file in ["rice.py", "rice_helpers.py", "rice_rllib.yaml"]:
-            if file not in files:
-                success = False
-                logging.error(
-                    "%s is not present in the results directory: %s!", file, results_dir
-                )
-                comment = f"{file} is not present in the results directory!"
-                break
-            success = True
-            comment = "Valid submission"
-    else:
-        success = False
-        logging.error(
-            "Missing identifier file! Either the .rllib or the .warpdrive "
-            "file must be present in the results directory: %s",
-            results_dir,
-        )
-        comment = "Missing identifier file!"
-
-    return framework, success, comment
-
-
-def prepare_submission(results_dir: Path):
-    """
-    # Validate all the submission files and compress into a .zip.
-    Note: This method is also invoked in the trainer script itself!
-    So if you ran the training script, you may not need to re-run this.
-    Args results_dir: the directory where all the training files were saved.
-    """
-    assert isinstance(results_dir, Path)
-
-    # Validate the results directory
-    # validate_dir(results_dir)
-
-    # Make a temporary copy of the results directory for zipping
-    results_dir_copy = results_dir.parent / "tmp_copy"
-    shutil.copytree(results_dir, results_dir_copy)
-
-    # Remove all the checkpoint state files from the tmp directory except for the last one
-    policy_models = list(results_dir_copy.glob("*.state_dict"))
-    policy_models = sorted(policy_models, key=lambda x: x.stat().st_mtime)
-    _ = [policy_model.unlink() for policy_model in policy_models[:-1]]
-
-    # Create the submission file and delete the temporary copy
-    submission_file = Path("submissions") / results_dir.name
-    shutil.make_archive(submission_file, "zip", results_dir_copy)
-    print("NOTE: The submission file is created at:", submission_file.with_suffix(".zip"))
-    shutil.rmtree(results_dir_copy)
-
-    return submission_file.with_suffix(".zip")
-
-
-def compute_metrics(fetch_episode_states, trainer, framework, submission_file, env_config, log_config=None, num_episodes=1):
+def compute_metrics(fetch_episode_states, trainer, framework, submission_file, log_config=None, num_episodes=1, include_c_e_idx=True):
     """
     Generate episode rollouts and compute metrics.
     """
@@ -460,7 +376,7 @@ def perform_evaluation(
     eval_metrics = {}
     assert num_episodes > 0
 
-    framework, success, comment = validate_dir(results_directory)
+    framework, success, comment = validate_dir(Path(results_directory))
     submission_file = prepare_submission(Path(results_directory))
 
     if success:
@@ -522,7 +438,6 @@ def perform_evaluation(
                                     trainer,
                                     framework,
                                     submission_file,
-                                    run_config["env"],
                                     run_config["logging"],
                                     num_episodes=num_episodes,
                                 )
