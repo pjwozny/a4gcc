@@ -16,6 +16,9 @@ from typing import Dict, Tuple
 import numpy as np
 from gym.spaces import MultiDiscrete
 
+_PUBLIC_REPO_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path = [_PUBLIC_REPO_DIR] + sys.path
+
 from negotiator import (
     BaseProtocol,
     NoProtocol,
@@ -38,10 +41,6 @@ PROTOCOLS = {
     "BasicClubDiscreteDefectClusterProposals": BasicClubDiscreteDefectClusterProposals,
     "BasicClubClusterProposals": BasicClubClusterProposals,
 }
-
-
-_PUBLIC_REPO_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path = [_PUBLIC_REPO_DIR] + sys.path
 
 from rice_helpers import (
     get_abatement_cost,
