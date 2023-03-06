@@ -17,7 +17,8 @@ from pathlib import Path
 from scripts.evaluate_submission import get_results_dir, validate_dir
 
 
-def prepare_submission(results_dir: Path):
+
+def prepare_submission(results_dir: Path) -> Path:
     """
     # Validate all the submission files and compress into a .zip.
     Note: This method is also invoked in the trainer script itself!
