@@ -19,7 +19,7 @@ import time
 
 import numpy as np
 import yaml
-from run_unittests import import_class_from_path
+from environment_wrapper import EnvWrapper
 from train import get_rllib_config
 from desired_outputs import desired_outputs
 from fixed_paths import PUBLIC_REPO_DIR
@@ -131,45 +131,6 @@ def recursive_list_to_np_array(dictionary):
                 raise AssertionError
         return new_d
     raise AssertionError
-
-
-class EnvWrapper(MultiAgentEnv):
-    """
-    The environment wrapper class.
-    """
-
-    def __init__(self, env_config=None):
-        env_config_copy = env_config.copy()
-        
-        if env_config_copy is None:
-            env_config_copy = {}
-        source_dir = env_config_copy.get("source_dir", None)
-        # Remove source_dir key in env_config if it exists
-        if "source_dir" in env_config_copy:
-            del env_config_copy["source_dir"]
-        if source_dir is None:
-            source_dir = PUBLIC_REPO_DIR
-        assert isinstance(env_config_copy, dict)
-        self.env = import_class_from_path("Rice", os.path.join(source_dir, "rice.py"))(
-            **env_config_copy
-        )
-        #turn off logging for training
-        self.env.logging = False
-        self.action_space = self.env.action_space
-
-        self.observation_space = recursive_obs_dict_to_spaces_dict(self.env.reset())
-
-    def reset(self):
-        """Reset the env."""
-        obs = self.env.reset()
-        return recursive_list_to_np_array(obs)
-
-    def step(self, actions=None):
-        """Step through the env."""
-        assert actions is not None
-        assert isinstance(actions, dict)
-        obs, rew, done, info = self.env.step(actions)
-        return recursive_list_to_np_array(obs), rew, done, info
 
 
 def save_model_checkpoint(trainer_obj=None, save_directory=None, current_timestep=0):
