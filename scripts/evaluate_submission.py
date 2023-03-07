@@ -422,17 +422,9 @@ def perform_evaluation(
 
     if success:
         logging.info("Running unit tests...")
-        this_file_dir = os.path.dirname(os.path.abspath(__file__))
 
         try:
-            subprocess.check_output(
-                [
-                    "python",
-                    os.path.join(this_file_dir, "run_unittests.py"),
-                    "--results_dir",
-                    results_directory,
-                ],
-            )
+            run_unittests(results_directory)
             logging.info("DONE")
 
             if success:

@@ -17,7 +17,6 @@ import sys
 import unittest
 
 import numpy as np
-from evaluate_submission import get_results_dir
 
 from fixed_paths import PUBLIC_REPO_DIR
 sys.path.append(PUBLIC_REPO_DIR)
@@ -264,14 +263,7 @@ class TestEnv(unittest.TestCase):
             )
 
 
-if __name__ == "__main__":
-    logging.info("Running env unit tests...")
 
-    # Set the results directory
-    results_dir, parser = get_results_dir()
-    parser.add_argument("unittest_args", nargs="*")
-    args = parser.parse_args()
-    sys.argv[1:] = args.unittest_args
+def run_unittests(results_dir):
     TestEnv.results_dir = results_dir
-
-    unittest.main()
+    unittest.main(module="run_unittests", argv=[sys.argv[0]], exit=False)
