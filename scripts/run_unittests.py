@@ -18,6 +18,7 @@ import unittest
 
 import numpy as np
 
+sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 from fixed_paths import PUBLIC_REPO_DIR
 sys.path.append(PUBLIC_REPO_DIR)
 
