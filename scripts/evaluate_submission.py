@@ -10,6 +10,7 @@ Evaluation script for the rice environment
 """
 
 import argparse
+import json
 import logging
 import os
 import shutil
@@ -24,11 +25,13 @@ import yaml
 import pickle as pkl
 from pathlib import Path
 from visualizeOutputs import construct_stacked_bar_chart
+from run_unittests import fetch_base_env, run_unittests
 from create_submission_zip import prepare_submission, validate_dir
 
 _path = Path(os.path.abspath(__file__))
 
 from fixed_paths import PUBLIC_REPO_DIR
+from gym.spaces import MultiDiscrete
 sys.path.append(os.path.join(PUBLIC_REPO_DIR, "scripts"))
 print("Using PUBLIC_REPO_DIR = {}".format(PUBLIC_REPO_DIR))
 
@@ -270,7 +273,26 @@ def compute_metrics(fetch_episode_states, trainer, framework, submission_file, l
                     table = wandb.Table(data=data, columns = ["Steps", "y"])
                     wandb.log({title : wandb.plot.line(table, "Steps", "y",
                             title=title)})
-
+        if include_c_e_idx:
+            if not os.path.exists(_INDEXES_FILENAME):
+                # Write min, max climate and economic index values to a file
+                # for use during evaluation.
+                indices_dict = generate_min_max_climate_economic_indices()
+                # Write indices to a file
+                with open(_INDEXES_FILENAME, "w", encoding="utf-8") as file_ptr:
+                    file_ptr.write(json.dumps(indices_dict))
+            with open(_INDEXES_FILENAME, "r", encoding="utf-8") as file_ptr:
+                index_dict = json.load(file_ptr)
+            eval_metrics["climate_index"] = np.round(
+                (eval_metrics["Temperature Rise"] - index_dict["min_ci"])
+                / (index_dict["max_ci"] - index_dict["min_ci"]),
+                2,
+            )
+            eval_metrics["economic_index"] = np.round(
+                (eval_metrics["Gross Output"] - index_dict["min_ei"])
+                / (index_dict["max_ei"] - index_dict["min_ei"]),
+                2,
+            )
         success = True
         comment = "Successful submission"
     except Exception as err:
@@ -289,7 +311,7 @@ def compute_metrics(fetch_episode_states, trainer, framework, submission_file, l
     return success, comment, eval_metrics
 
 
-def val_metrics(trainer, logged_ts, framework, num_episodes=1):
+def val_metrics(trainer, logged_ts, framework, num_episodes=1, include_c_e_idx=True):
     """
     Generate episode rollouts and compute metrics.
     """
@@ -339,7 +361,26 @@ def val_metrics(trainer, logged_ts, framework, num_episodes=1):
             eval_metrics[metrics_to_label_dict[0]] = perform_format(
                 mean_feature_value, metrics_to_label_dict[1]
             )
-
+        if include_c_e_idx:
+            if not os.path.exists(_INDEXES_FILENAME):
+                # Write min, max climate and economic index values to a file
+                # for use during evaluation.
+                indices_dict = generate_min_max_climate_economic_indices()
+                # Write indices to a file
+                with open(_INDEXES_FILENAME, "w", encoding="utf-8") as file_ptr:
+                    file_ptr.write(json.dumps(indices_dict))
+            with open(_INDEXES_FILENAME, "r", encoding="utf-8") as file_ptr:
+                index_dict = json.load(file_ptr)
+            eval_metrics["climate_index"] = np.round(
+                (eval_metrics["Temperature Rise"] - index_dict["min_ci"])
+                / (index_dict["max_ci"] - index_dict["min_ci"]),
+                2,
+            )
+            eval_metrics["economic_index"] = np.round(
+                (eval_metrics["Gross Output"] - index_dict["min_ei"])
+                / (index_dict["max_ei"] - index_dict["min_ei"]),
+                2,
+            )
         success = True
         comment = "Successful submission"
     except Exception as err:
@@ -468,6 +509,74 @@ def perform_evaluation(
             comment = "Unit tests were not successful."
 
     return framework, success, eval_metrics, comment
+
+
+def get_temp_rise_and_gross_output(env, actions):
+    env.reset()
+    for _ in range(env.episode_length):
+        env.step(actions)
+    temperature_array = env.global_state["global_temperature"]["value"]
+    temperature_rise = temperature_array[-1, 0] - temperature_array[0, 0]
+
+    total_gross_production = np.sum(
+        env.global_state["gross_output_all_regions"]["value"]
+    )
+    return temperature_rise, total_gross_production
+
+
+def generate_min_max_climate_economic_indices():
+    """
+    Generate min and max climate and economic indices for the leaderboard.
+    0% savings, 100% mitigation => best climate index, worst economic index
+    100% savings, 0% mitigation => worst climate index, best economic index
+    """
+    env = fetch_base_env()
+    assert isinstance(
+        env.action_space[0], MultiDiscrete
+    ), "Unknown action space for env."
+    all_zero_actions = {
+        agent_id: np.zeros(
+            len(env.action_space[agent_id].nvec),
+            dtype=np.int32,
+        )
+        for agent_id in range(env.num_agents)
+    }
+
+    # 0% savings, 100% mitigation
+    low_savings_high_mitigation_actions = {}
+    savings_action_idx = 0
+    mitigation_action_idx = 1
+    for agent_id in range(env.num_agents):
+        low_savings_high_mitigation_actions[agent_id] = all_zero_actions[
+            agent_id
+        ].copy()
+        low_savings_high_mitigation_actions[agent_id][
+            mitigation_action_idx
+        ] = env.num_discrete_action_levels
+    # Best climate index, worst economic index
+    best_ci, worst_ei = get_temp_rise_and_gross_output(
+        env, low_savings_high_mitigation_actions
+    )
+
+    high_savings_low_mitigation_actions = {}
+    for agent_id in range(env.num_agents):
+        high_savings_low_mitigation_actions[agent_id] = all_zero_actions[
+            agent_id
+        ].copy()
+        high_savings_low_mitigation_actions[agent_id][
+            savings_action_idx
+        ] = env.num_discrete_action_levels
+    worst_ci, best_ei = get_temp_rise_and_gross_output(
+        env, high_savings_low_mitigation_actions
+    )
+
+    index_dict = {
+        "min_ci": float(worst_ci),
+        "max_ci": float(best_ci),
+        "min_ei": float(worst_ei),
+        "max_ei": float(best_ei),
+    }
+    return index_dict
 
 
 if __name__ == "__main__":
