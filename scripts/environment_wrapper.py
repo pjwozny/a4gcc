@@ -1,7 +1,9 @@
+from pathlib import Path
 import numpy as np
 from gym.spaces import Box, Dict
 from ray.rllib.env.multi_agent_env import MultiAgentEnv
 
+from scripts.run_unittests import import_class_from_path
 from rice import Rice
 
 BIG_NUMBER = 1e20
@@ -18,9 +20,13 @@ class EnvWrapper(MultiAgentEnv):
         env_config_copy = env_config.copy()
 
         if "source_dir" in env_config_copy:
+            source_dir = Path(env_config_copy["source_dir"])
+            rice_class = import_class_from_path("Rice", source_dir / "rice.py")
             del env_config_copy["source_dir"]
+        else:
+            rice_class = Rice
 
-        self.env = Rice(**env_config_copy)
+        self.env = rice_class(**env_config_copy)
 
         self.action_space = self.env.action_space
 
