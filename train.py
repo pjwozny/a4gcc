@@ -222,12 +222,13 @@ def load_model_checkpoints(trainer_obj=None, save_directory=None, ckpt_idx=-1):
     trainer_obj.set_weights(model_params)
 
 
-def create_trainer(run_config, seed=None) -> Algorithm:
+def create_trainer(run_config, source_dir=None, seed=None) -> Algorithm:
     """
     Create the RLlib trainer.
     """
     # Create the A2C trainer.
-    # run_config["env"]["source_dir"] = source_dir
+    if source_dir:
+        run_config["env"]["source_dir"] = source_dir
     trainer_config = get_rllib_config(
         run_config=run_config, env_class=EnvWrapper, seed=seed
     )
