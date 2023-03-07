@@ -240,7 +240,6 @@ def load_model_checkpoints(trainer_obj=None, save_directory=None, ckpt_idx=-1):
         policy_name = file.stem.split("_")[0]
         policy_name_files[policy_name].append(file)
 
-    print(policy_name_files)
     assert len(policy_name_files) == len(trainer_obj.config["multiagent"]["policies"])
 
     model_params = trainer_obj.get_weights()
