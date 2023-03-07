@@ -201,7 +201,7 @@ def compute_metrics(fetch_episode_states, trainer, framework, submission_file, l
             wandb.log({"minimum_mitigation_rate Counts Across Time":construct_stacked_bar_chart(episode_states[0],
                                         field="minimum_mitigation_rate_all_regions")})
 
-        for feature in desired_outputs:
+        for feature in episode_states[0].keys():
             feature_values = [None for _ in range(num_episodes)]
 
             if feature == "global_temperature":

@@ -287,6 +287,13 @@ def create_trainer(exp_run_config=None, source_dir=None, results_dir=None, seed=
     return rllib_trainer, results_save_dir
 
 
+def part_of(state, global_state):
+    if state not in global_state:
+        print(f"WARNING: {state} not part of global state, removing from evaluation")
+        return False
+    return True
+
+
 def fetch_episode_states(trainer_obj=None, episode_states=None):
     """
     Helper function to rollout the env and fetch env states for an episode.
@@ -303,6 +310,8 @@ def fetch_episode_states(trainer_obj=None, episode_states=None):
     obs = env_object.reset()
 
     env = env_object.env
+
+    episode_states = [s for s in episode_states if part_of(s, env.global_state)]
 
     for state in episode_states:
         assert state in env.global_state, f"{state} is not in global state!"
@@ -378,6 +387,7 @@ def fetch_episode_states_freerider(trainer_obj=None, episode_states=None):
         obs = env_object.reset()
 
         env = env_object.env
+        episode_states = [s for s in episode_states if part_of(s, env.global_state)]
         
         #choose one agent to be the freerider
         fr_id = np.random.randint(0,env.num_agents) 
@@ -539,6 +549,8 @@ def fetch_episode_states_tariff(trainer_obj=None, episode_states=None):
             obs = env_object.reset()
 
             env = env_object.env
+
+            episode_states = [s for s in episode_states if part_of(s, env.global_state)]
 
             for state in episode_states:
                 assert state in env.global_state, f"{state} is not in global state!"
