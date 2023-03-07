@@ -60,6 +60,7 @@ def train(run_config, save_dir):
     # ------------------------------------------------
     num_episodes = run_config["trainer"]["num_episodes"]
     model_save_freq = run_config["saving"]["model_params_save_freq"]
+    next_model_checkpoint = model_save_freq
 
     result = {"episodes_total": 0}
     while result["episodes_total"] < num_episodes:
@@ -83,7 +84,8 @@ def train(run_config, save_dir):
                 step=result["episodes_total"],
             )
 
-        if result["episodes_total"] % model_save_freq == 0:
+        if result["episodes_total"] >= next_model_checkpoint:
+            next_model_checkpoint += model_save_freq
             total_episodes = result["episodes_total"]
             save_model_checkpoint(trainer, save_dir, total_episodes)
             logging.info(result)
@@ -111,9 +113,12 @@ def get_rllib_config(run_config, env_class, seed=None):
     env_config = run_config["env"]
     assert isinstance(env_config, dict)
     env_object = env_class(env_config=env_config)
+    episode_length = env_object.env.episode_length
 
     # Define all the policies here
     policy_config = run_config["policy"]["regions"]
+
+    policy_config["entropy_coeff_schedule"] = [[episode * episode_length, coeff] for episode, coeff in policy_config["entropy_coeff_schedule"]]
 
     # Map of type MultiAgentPolicyConfigDict from policy ids to tuples
     # of (policy_cls, obs_space, act_space, config). This defines the
@@ -128,8 +133,7 @@ def get_rllib_config(run_config, env_class, seed=None):
     }
 
     # Function mapping agent ids to policy ids.
-    def policy_mapping_fn(agent_id=None):
-        assert agent_id is not None
+    def policy_mapping_fn(agent_id):
         return "regions"
 
     # Optional list of policies to train, or None for all policies.
@@ -142,7 +146,6 @@ def get_rllib_config(run_config, env_class, seed=None):
         "policy_mapping_fn": policy_mapping_fn,
     }
 
-    episode_length = EnvWrapper(run_config["env"]).env.episode_length
     train_config = run_config["trainer"]
     rllib_config = {
         # Arguments dict passed to the env creator as an EnvContext object (which
