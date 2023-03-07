@@ -16,6 +16,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from collections import OrderedDict
 
@@ -94,7 +95,7 @@ _METRICS_TO_LABEL_DICT["minimum_mitigation_rate_all_regions"] = ("Minimum Mitiga
 
 # _METRICS_TO_LABEL_DICT["reward_all_regions"] = ("Episode Reward", 2)
 
-def get_imports(framework=None):
+def get_imports(framework, experiment_id):
     """
     Fetch relevant imports.
     """
@@ -122,9 +123,7 @@ def get_imports(framework=None):
         "none":fetch_episode_states
     }
 
-    parser = parse_args()
-    args = parser.parse_args()
-    fetch_episode_states = episode_fetchers[args.experiment]
+    fetch_episode_states = episode_fetchers[experiment_id]
 
     return create_trainer, load_model_checkpoints, fetch_episode_states
 
@@ -149,27 +148,11 @@ def parse_args():
         required=False,
     )
 
-    return parser
-
-
-def get_results_dir():
-    """
-    Obtain the 'results' directory from the system arguments.
-    """
-
-    parser = parse_args()
     args = parser.parse_args()
     results_dir = args.results_dir
+    experiment_id = args.experiment
 
-    try:
-        # Also handle a zipped file
-        if results_dir.endswith(".zip"):
-            unzipped_results_dir = os.path.join("/tmp", str(time.time()))
-            shutil.unpack_archive(results_dir, unzipped_results_dir)
-            results_dir = unzipped_results_dir
-        return results_dir, parser
-    except Exception as err:
-        raise ValueError("Cannot obtain the results directory") from err
+    return results_dir, experiment_id, parser
 
 
 def compute_metrics(fetch_episode_states, trainer, framework, submission_file, log_config=None, num_episodes=1, include_c_e_idx=True):
@@ -406,7 +389,8 @@ def perform_format(val, num_decimal_places):
 
 
 def perform_evaluation(
-    results_directory=None,
+    results_directory,
+    experiment_id,
     num_episodes=1,
     eval_seed=None,
 ):
@@ -432,7 +416,7 @@ def perform_evaluation(
                     create_trainer,
                     load_model_checkpoints,
                     fetch_episode_states,
-                ) = get_imports(framework=framework)
+                ) = get_imports(framework, experiment_id)
 
                 logging.info("Performing eval...")
 
@@ -573,10 +557,19 @@ def generate_min_max_climate_economic_indices():
 
 if __name__ == "__main__":
     logging.info("This script performs evaluation of your code.")
-    results_dir = get_results_dir()[0]
+    results_dir, experiment_id, _ = parse_args()
+
+    try:
+        # Also handle a zipped file
+        if results_dir.endswith(".zip"):
+            unzipped_results_dir = Path(tempfile.gettempdir()) / time.time()
+            shutil.unpack_archive(results_dir, unzipped_results_dir)
+            results_dir = unzipped_results_dir
+    except Exception as err:
+        raise ValueError("Cannot obtain the results directory") from err
 
     framework_used, succeeded, metrics, comments = perform_evaluation(
-        results_dir, eval_seed=_SEED
+        results_dir, experiment_id, eval_seed=_SEED
     )
     print(f"Framework used: {framework_used}")
     print(f"Succeeded: {succeeded}")
