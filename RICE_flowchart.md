@@ -14,39 +14,69 @@ flowchart LR
     dom_pref
     num_regions-->for_pref
     end
-    subgraph RICE constants
-    p_b
-    delta_pb
-    theta_2
-    gamma
-    K_0
-    alpha
-    delta_K
-    L_a
-    l_g
-    delta_A
-    g_sigma
-    delta_sigma
-    end
     subgraph DICE constants
+    t_0
+    Delta
+    N
+    Phi_T
+    B_T
+    Phi_M
+    B_M
+    eta
+    M_AT_1750
     f_0
     f_1
     t_f
-    delta_EL
     E_L0
-    Delta
-    Phi_T
-    B_T
+    delta_EL
+    M_AT_0
+    M_UP_0
+    M_LO_0
+    e_0
+    q_0
+    mu_0
     F_2x
-    M_AT_1750
-    Phi_M
-    B_M
-    g_A
+    T_2x
     end
-    subgraph Region constants
+    subgraph RICE constants
+    gamma_overwritten["gamma"]
+    theta_2
+    a_1_overwritten["a_1"]
+    a_2_overwritten["a_2"]
+    a_3_overwritten["a_3"]
+    delta_K
+    alpha
+    rho
+    L_0_overwritten["L_0"]
+    L_a_overwritten["L_a"]
+    l_g_overwritten["l_g"]
+    A_0_overwritten["A_0"]
+    g_A_overwritten["g_A"]
+    delta_A_overwritten["delta_A"]
+    sigma_0_overwritten["sigma_0"]
+    g_sigma
+    delta_sigma
+    p_b
+    delta_pb
+    scale_1
+    scale_2
+    T_AT_0
+    T_LO_0
+    K_0_overwritten["K_0"]
+    end
+    subgraph Region RICE constants
+    A_0
+    K_0
+    L_0
+    L_a
     a_1
     a_2
     a_3
+    delta_A
+    g_A
+    gamma
+    l_g
+    sigma_0
     end
     get_exogenous_emissions["f_0 + min(f_1 - f_0, (f_1 - f_0) / t_f * (activity_timestep - 1))"]
     get_land_emissions["E_L0 * pow(1 - delta_EL, activity_timestep - 1) / num_regions"]
