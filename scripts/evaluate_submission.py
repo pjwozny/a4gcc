@@ -10,11 +10,13 @@ Evaluation script for the rice environment
 """
 
 import argparse
+import json
 import logging
 import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from collections import OrderedDict
 
@@ -24,11 +26,13 @@ import yaml
 import pickle as pkl
 from pathlib import Path
 from visualizeOutputs import construct_stacked_bar_chart
+from run_unittests import fetch_base_env, run_unittests
 from create_submission_zip import prepare_submission, validate_dir
 
 _path = Path(os.path.abspath(__file__))
 
 from fixed_paths import PUBLIC_REPO_DIR
+from gym.spaces import MultiDiscrete
 sys.path.append(os.path.join(PUBLIC_REPO_DIR, "scripts"))
 print("Using PUBLIC_REPO_DIR = {}".format(PUBLIC_REPO_DIR))
 
@@ -91,7 +95,7 @@ _METRICS_TO_LABEL_DICT["minimum_mitigation_rate_all_regions"] = ("Minimum Mitiga
 
 # _METRICS_TO_LABEL_DICT["reward_all_regions"] = ("Episode Reward", 2)
 
-def get_imports(framework=None):
+def get_imports(framework, experiment_id):
     """
     Fetch relevant imports.
     """
@@ -119,9 +123,7 @@ def get_imports(framework=None):
         "none":fetch_episode_states
     }
 
-    parser = parse_args()
-    args = parser.parse_args()
-    fetch_episode_states = episode_fetchers[args.experiment]
+    fetch_episode_states = episode_fetchers[experiment_id]
 
     return create_trainer, load_model_checkpoints, fetch_episode_states
 
@@ -146,27 +148,11 @@ def parse_args():
         required=False,
     )
 
-    return parser
-
-
-def get_results_dir():
-    """
-    Obtain the 'results' directory from the system arguments.
-    """
-
-    parser = parse_args()
     args = parser.parse_args()
     results_dir = args.results_dir
+    experiment_id = args.experiment
 
-    try:
-        # Also handle a zipped file
-        if results_dir.endswith(".zip"):
-            unzipped_results_dir = os.path.join("/tmp", str(time.time()))
-            shutil.unpack_archive(results_dir, unzipped_results_dir)
-            results_dir = unzipped_results_dir
-        return results_dir, parser
-    except Exception as err:
-        raise ValueError("Cannot obtain the results directory") from err
+    return results_dir, experiment_id, parser
 
 
 def compute_metrics(fetch_episode_states, trainer, framework, submission_file, log_config=None, num_episodes=1, include_c_e_idx=True):
@@ -215,7 +201,7 @@ def compute_metrics(fetch_episode_states, trainer, framework, submission_file, l
             wandb.log({"minimum_mitigation_rate Counts Across Time":construct_stacked_bar_chart(episode_states[0],
                                         field="minimum_mitigation_rate_all_regions")})
 
-        for feature in desired_outputs:
+        for feature in episode_states[0].keys():
             feature_values = [None for _ in range(num_episodes)]
 
             if feature == "global_temperature":
@@ -270,7 +256,26 @@ def compute_metrics(fetch_episode_states, trainer, framework, submission_file, l
                     table = wandb.Table(data=data, columns = ["Steps", "y"])
                     wandb.log({title : wandb.plot.line(table, "Steps", "y",
                             title=title)})
-
+        if include_c_e_idx:
+            if not os.path.exists(_INDEXES_FILENAME):
+                # Write min, max climate and economic index values to a file
+                # for use during evaluation.
+                indices_dict = generate_min_max_climate_economic_indices()
+                # Write indices to a file
+                with open(_INDEXES_FILENAME, "w", encoding="utf-8") as file_ptr:
+                    file_ptr.write(json.dumps(indices_dict))
+            with open(_INDEXES_FILENAME, "r", encoding="utf-8") as file_ptr:
+                index_dict = json.load(file_ptr)
+            eval_metrics["climate_index"] = np.round(
+                (eval_metrics["Temperature Rise"] - index_dict["min_ci"])
+                / (index_dict["max_ci"] - index_dict["min_ci"]),
+                2,
+            )
+            eval_metrics["economic_index"] = np.round(
+                (eval_metrics["Gross Output"] - index_dict["min_ei"])
+                / (index_dict["max_ei"] - index_dict["min_ei"]),
+                2,
+            )
         success = True
         comment = "Successful submission"
     except Exception as err:
@@ -289,68 +294,6 @@ def compute_metrics(fetch_episode_states, trainer, framework, submission_file, l
     return success, comment, eval_metrics
 
 
-def val_metrics(trainer, logged_ts, framework, num_episodes=1):
-    """
-    Generate episode rollouts and compute metrics.
-    """
-    assert trainer is not None
-    available_frameworks = ["rllib", "warpdrive"]
-    assert (
-        framework in available_frameworks
-    ), f"Invalid framework {framework}, should be in f{available_frameworks}."
-
-    # Fetch all the desired outputs to compute various metrics.
-    desired_outputs = list(_METRICS_TO_LABEL_DICT.keys())
-    episode_states = {}
-    eval_metrics = {}
-    try:
-        for episode_id in range(num_episodes):
-            episode_states[episode_id] = logged_ts
-            
-        for feature in desired_outputs:
-            feature_values = [None for _ in range(num_episodes)]
-
-            if feature == "global_temperature":
-                # Get the temp rise for upper strata
-                for episode_id in range(num_episodes):
-                    feature_values[episode_id] = (
-                        episode_states[episode_id][feature][-1, 0]
-                        - episode_states[episode_id][feature][0, 0]
-                    )
-
-            elif feature == "global_carbon_mass":
-                for episode_id in range(num_episodes):
-                    feature_values[episode_id] = episode_states[episode_id][feature][
-                        -1, 0
-                    ]
-
-            else:
-                for episode_id in range(num_episodes):
-                    feature_values[episode_id] = np.sum(
-                        episode_states[episode_id][feature]
-                    )
-
-            # Compute mean feature value across episodes
-            mean_feature_value = np.mean(feature_values)
-
-            # Formatting the values
-            metrics_to_label_dict = _METRICS_TO_LABEL_DICT[feature]
-
-            eval_metrics[metrics_to_label_dict[0]] = perform_format(
-                mean_feature_value, metrics_to_label_dict[1]
-            )
-
-        success = True
-        comment = "Successful submission"
-    except Exception as err:
-        logging.error(err)
-        success = False
-        comment = "Could not obtain an episode rollout!"
-        eval_metrics = {}
-
-    return success, comment, eval_metrics
-
-
 def perform_format(val, num_decimal_places):
     """
     Format value to the number of desired decimal points.
@@ -365,7 +308,8 @@ def perform_format(val, num_decimal_places):
 
 
 def perform_evaluation(
-    results_directory=None,
+    results_directory,
+    experiment_id,
     num_episodes=1,
     eval_seed=None,
 ):
@@ -381,17 +325,9 @@ def perform_evaluation(
 
     if success:
         logging.info("Running unit tests...")
-        this_file_dir = os.path.dirname(os.path.abspath(__file__))
 
         try:
-            subprocess.check_output(
-                [
-                    "python",
-                    os.path.join(this_file_dir, "run_unittests.py"),
-                    "--results_dir",
-                    results_directory,
-                ],
-            )
+            run_unittests(results_directory)
             logging.info("DONE")
 
             if success:
@@ -399,7 +335,7 @@ def perform_evaluation(
                     create_trainer,
                     load_model_checkpoints,
                     fetch_episode_states,
-                ) = get_imports(framework=framework)
+                ) = get_imports(framework, experiment_id)
 
                 logging.info("Performing eval...")
 
@@ -470,12 +406,89 @@ def perform_evaluation(
     return framework, success, eval_metrics, comment
 
 
+def get_temp_rise_and_gross_output(env, actions):
+    env.reset()
+    for _ in range(env.episode_length):
+        env.step(actions)
+    temperature_array = env.global_state["global_temperature"]["value"]
+    temperature_rise = temperature_array[-1, 0] - temperature_array[0, 0]
+
+    total_gross_production = np.sum(
+        env.global_state["gross_output_all_regions"]["value"]
+    )
+    return temperature_rise, total_gross_production
+
+
+def generate_min_max_climate_economic_indices():
+    """
+    Generate min and max climate and economic indices for the leaderboard.
+    0% savings, 100% mitigation => best climate index, worst economic index
+    100% savings, 0% mitigation => worst climate index, best economic index
+    """
+    env = fetch_base_env()
+    assert isinstance(
+        env.action_space[0], MultiDiscrete
+    ), "Unknown action space for env."
+    all_zero_actions = {
+        agent_id: np.zeros(
+            len(env.action_space[agent_id].nvec),
+            dtype=np.int32,
+        )
+        for agent_id in range(env.num_agents)
+    }
+
+    # 0% savings, 100% mitigation
+    low_savings_high_mitigation_actions = {}
+    savings_action_idx = 0
+    mitigation_action_idx = 1
+    for agent_id in range(env.num_agents):
+        low_savings_high_mitigation_actions[agent_id] = all_zero_actions[
+            agent_id
+        ].copy()
+        low_savings_high_mitigation_actions[agent_id][
+            mitigation_action_idx
+        ] = env.num_discrete_action_levels
+    # Best climate index, worst economic index
+    best_ci, worst_ei = get_temp_rise_and_gross_output(
+        env, low_savings_high_mitigation_actions
+    )
+
+    high_savings_low_mitigation_actions = {}
+    for agent_id in range(env.num_agents):
+        high_savings_low_mitigation_actions[agent_id] = all_zero_actions[
+            agent_id
+        ].copy()
+        high_savings_low_mitigation_actions[agent_id][
+            savings_action_idx
+        ] = env.num_discrete_action_levels
+    worst_ci, best_ei = get_temp_rise_and_gross_output(
+        env, high_savings_low_mitigation_actions
+    )
+
+    index_dict = {
+        "min_ci": float(worst_ci),
+        "max_ci": float(best_ci),
+        "min_ei": float(worst_ei),
+        "max_ei": float(best_ei),
+    }
+    return index_dict
+
+
 if __name__ == "__main__":
     logging.info("This script performs evaluation of your code.")
-    results_dir = get_results_dir()[0]
+    results_dir, experiment_id, _ = parse_args()
+
+    try:
+        # Also handle a zipped file
+        if results_dir.endswith(".zip"):
+            unzipped_results_dir = Path(tempfile.gettempdir()) / str(time.time())
+            shutil.unpack_archive(results_dir, unzipped_results_dir)
+            results_dir = unzipped_results_dir
+    except Exception as err:
+        raise ValueError("Cannot obtain the results directory") from err
 
     framework_used, succeeded, metrics, comments = perform_evaluation(
-        results_dir, eval_seed=_SEED
+        results_dir, experiment_id, eval_seed=_SEED
     )
     print(f"Framework used: {framework_used}")
     print(f"Succeeded: {succeeded}")
