@@ -1,12 +1,12 @@
-import pickle as pkl
-import numpy as np
 from collections import Counter
+
 import matplotlib.pyplot as plt
 import pandas as pd
-import os
-from fixed_paths import PUBLIC_REPO_DIR
 
-def construct_stacked_bar_chart(global_states, wandb,
+import wandb
+
+
+def construct_stacked_bar_chart(global_states,
                             num_discrete_actions = 10, 
                             field = "mitigation_rate_all_regions"):
 
