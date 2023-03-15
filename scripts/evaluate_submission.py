@@ -309,7 +309,7 @@ def perform_format(val, num_decimal_places):
 
 def perform_evaluation(
     results_directory,
-    experiment_id,
+    experiment_id="none",
     num_episodes=1,
     eval_seed=None,
 ):
