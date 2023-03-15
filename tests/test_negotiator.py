@@ -4,11 +4,12 @@ import pytest
 from negotiator import (
     NoProtocol,
     BaseProtocol,
+    BasicClub,
     BasicClubDiscreteDefect,
     BilateralNegotiator,
 )
 
-PROTOCOLS = [NoProtocol, BilateralNegotiator, BasicClubDiscreteDefect]
+PROTOCOLS = [NoProtocol, BilateralNegotiator, BasicClub, BasicClubDiscreteDefect]
 
 
 @pytest.mark.parametrize("protocol_class", PROTOCOLS)
