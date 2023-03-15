@@ -197,9 +197,10 @@ def compute_metrics(fetch_episode_states, trainer, framework, submission_file, l
             wandb.log({"mitigation_rate Counts Across Time":construct_stacked_bar_chart(episode_states[0],
                                         field="mitigation_rate_all_regions")})
 
-            #log mitigation rate counts of each country over time
-            wandb.log({"minimum_mitigation_rate Counts Across Time":construct_stacked_bar_chart(episode_states[0],
-                                        field="minimum_mitigation_rate_all_regions")})
+            if "minimum_mitigation_rate_all_regions" in episode_states[0]:
+                #log mitigation rate counts of each country over time
+                wandb.log({"minimum_mitigation_rate Counts Across Time":construct_stacked_bar_chart(episode_states[0],
+                                            field="minimum_mitigation_rate_all_regions")})
 
         for feature in episode_states[0].keys():
             feature_values = [None for _ in range(num_episodes)]
