@@ -17,7 +17,6 @@ import sys
 import unittest
 
 import numpy as np
-from evaluate_submission import get_results_dir
 
 from fixed_paths import PUBLIC_REPO_DIR
 sys.path.append(PUBLIC_REPO_DIR)
@@ -67,10 +66,11 @@ def fetch_base_env(base_folder=".tmp/_base"):
     os.chdir(base_folder)
     subprocess.call(["wget", "-O", "rice.py", _BASE_RICE_PATH])
     subprocess.call(["wget", "-O", "rice_helpers.py", _BASE_RICE_HELPERS_PATH])
-    shutil.copytree(
-        os.path.join(PUBLIC_REPO_DIR, "region_yamls"),
-        os.path.join(base_folder, "region_yamls"),
-    )
+    if "region_yamls" not in os.listdir(base_folder):
+        shutil.copytree(
+            os.path.join(PUBLIC_REPO_DIR, "region_yamls"),
+            os.path.join(base_folder, "region_yamls"),
+        )
 
     base_rice = import_class_from_path("Rice", os.path.join(base_folder, "rice.py"))()
 
@@ -264,14 +264,7 @@ class TestEnv(unittest.TestCase):
             )
 
 
-if __name__ == "__main__":
-    logging.info("Running env unit tests...")
 
-    # Set the results directory
-    results_dir, parser = get_results_dir()
-    parser.add_argument("unittest_args", nargs="*")
-    args = parser.parse_args()
-    sys.argv[1:] = args.unittest_args
+def run_unittests(results_dir):
     TestEnv.results_dir = results_dir
-
-    unittest.main()
+    unittest.main(module="run_unittests", argv=[sys.argv[0]], exit=False)
