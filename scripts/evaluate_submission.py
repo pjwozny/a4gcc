@@ -481,7 +481,8 @@ if __name__ == "__main__":
     try:
         # Also handle a zipped file
         if results_dir.endswith(".zip"):
-            unzipped_results_dir = Path(tempfile.gettempdir()) / str(time.time())
+            path = Path(results_dir)
+            unzipped_results_dir = path.parent / "unzipped" / path.stem
             shutil.unpack_archive(results_dir, unzipped_results_dir)
             results_dir = unzipped_results_dir
     except Exception as err:
