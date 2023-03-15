@@ -419,9 +419,9 @@ class Rice:
             "damages_all_regions",
             "abatement_cost_all_regions",
             "production_all_regions",
-            "utility_all_regions",
+            # "utility_all_regions",
             "social_welfare_all_regions",
-            "reward_all_regions",
+            # "reward_all_regions",
         ]
 
         # Features concerning two regions
