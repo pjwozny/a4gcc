@@ -12,7 +12,7 @@ flowchart LR
     init_capital_multiplier
     sub_rate
     dom_pref
-    num_regions-->for_pref
+    num_regions --> for_pref
     end
     subgraph DICE constants
     t_0
@@ -113,165 +113,165 @@ flowchart LR
     get_production_factor["production_factor * (exp(0.0033) + g_A * exp(-delta_A * Delta * (activity_timestep - 1)))"]
     get_carbon_intensity["intensity * exp(-g_sigma * pow(1 - delta_sigma, delta * (activity_timestep - 1)) * Delta)"]
 
-    E_L0-->get_land_emissions
-    delta_EL-->get_land_emissions
-    activity_timestep-->get_land_emissions
-    num_regions-->get_land_emissions
-    get_land_emissions-->global_land_emissions
+    E_L0 --> get_land_emissions
+    delta_EL --> get_land_emissions
+    activity_timestep --> get_land_emissions
+    num_regions --> get_land_emissions
+    get_land_emissions --> global_land_emissions
 
-    f_0-->get_exogenous_emissions
-    f_1-->get_exogenous_emissions
-    t_f-->get_exogenous_emissions
-    activity_timestep-->get_exogenous_emissions
-    get_exogenous_emissions-->global_exogenous_emissions
+    f_0 --> get_exogenous_emissions
+    f_1 --> get_exogenous_emissions
+    t_f --> get_exogenous_emissions
+    activity_timestep --> get_exogenous_emissions
+    get_exogenous_emissions --> global_exogenous_emissions
 
-    p_b-->get_mitigation_cost
-    theta_2-->get_mitigation_cost
-    delta_pb-->get_mitigation_cost
-    activity_timestep-->get_mitigation_cost
-    intensity-->|t+1|get_mitigation_cost
-    get_mitigation_cost-->mitigation_cost
+    p_b --> get_mitigation_cost
+    theta_2 --> get_mitigation_cost
+    delta_pb --> get_mitigation_cost
+    activity_timestep --> get_mitigation_cost
+    intensity --> |t+1|get_mitigation_cost
+    get_mitigation_cost --> mitigation_cost
 
-    t_at["temperature_atmosphere (t_at)"]-->|t+1|get_damages
-    a_1-->get_damages
-    a_2-->get_damages
-    a_3-->get_damages
-    get_damages-->damages
+    t_at["temperature_atmosphere (t_at)"] --> |t+1|get_damages
+    a_1 --> get_damages
+    a_2 --> get_damages
+    a_3 --> get_damages
+    get_damages --> damages
 
-    mitigation_rate-->get_abatement_cost
-    mitigation_cost-->get_abatement_cost
-    theta_2-->get_abatement_cost
-    get_abatement_cost-->abatement_cost
+    mitigation_rate --> get_abatement_cost
+    mitigation_cost --> get_abatement_cost
+    theta_2 --> get_abatement_cost
+    get_abatement_cost --> abatement_cost
 
-    production_factor-->|t+1|get_production
-    capital-->|t+1|get_production
-    labor-->|t+1|get_production
-    gamma-->get_production
-    get_production-->production
+    production_factor --> |t+1|get_production
+    capital --> |t+1|get_production
+    labor --> |t+1|get_production
+    gamma --> get_production
+    get_production --> production
 
-    damages-->get_gross_output
-    abatement_cost-->get_gross_output
-    production-->get_gross_output
-    get_gross_output-->gross_output
+    damages --> get_gross_output
+    abatement_cost --> get_gross_output
+    production --> get_gross_output
+    get_gross_output --> gross_output
 
-    gov_balance-->|t+1|eq1
-    balance_interest_rate-->eq1
-    eq1-->gov_balance_tmp
+    gov_balance --> |t+1|eq1
+    balance_interest_rate --> eq1
+    eq1 --> gov_balance_tmp
 
-    saving-->get_investment
-    gross_output-->get_investment
-    get_investment-->investment
+    saving --> get_investment
+    gross_output --> get_investment
+    get_investment --> investment
 
-    gov_balance_tmp-->eq2
-    init_capital_multiplier-->eq2
-    K_0-->eq2
-    eq2-->debt_ratio
+    gov_balance_tmp --> eq2
+    init_capital_multiplier --> eq2
+    K_0 --> eq2
+    eq2 --> debt_ratio
 
-    desired_imports-->|mine|eq3
-    gross_output-->eq3
-    debt_ratio-->eq3
-    eq3-->trade_gross_output_limited
+    desired_imports --> |mine|eq3
+    gross_output --> eq3
+    debt_ratio --> eq3
+    eq3 --> trade_gross_output_limited
 
-    max_export-->get_max_potential_export
-    gross_output-->get_max_potential_export
-    investment-->get_max_potential_export
-    get_max_potential_export-->max_potential_export
+    max_export --> get_max_potential_export
+    gross_output --> get_max_potential_export
+    investment --> get_max_potential_export
+    get_max_potential_export --> max_potential_export
 
-    desired_imports-->|others|eq4
-    max_potential_export-->eq4
-    eq4-->trade_max_export_limited
+    desired_imports --> |others|eq4
+    max_potential_export --> eq4
+    eq4 --> trade_max_export_limited
 
-    trade_gross_output_limited-->combine_trade
-    trade_max_export_limited-->combine_trade
-    combine_trade-->trade
+    trade_gross_output_limited --> combine_trade
+    trade_max_export_limited --> combine_trade
+    combine_trade --> trade
 
-    trade-->|imports|eq5
-    tariffs-->|t+1|eq5
-    eq5-->tariffed_imports
+    trade --> |imports|eq5
+    tariffs --> |t+1|eq5
+    eq5 --> tariffed_imports
 
-    trade-->|imports|eq6
-    tariffs-->|t+1|eq6
-    eq6-->tariff_revenue
+    trade --> |imports|eq6
+    tariffs --> |t+1|eq6
+    eq6 --> tariff_revenue
 
-    gross_output-->get_consumption
-    investment-->get_consumption
-    trade-->|exports|get_consumption
-    get_consumption-->domestic_consumption
+    gross_output --> get_consumption
+    investment --> get_consumption
+    trade --> |exports|get_consumption
+    get_consumption --> domestic_consumption
 
-    domestic_consumption-->get_armington_agg
-    tariffed_imports-->get_armington_agg
-    sub_rate-->get_armington_agg
-    dom_pref-->get_armington_agg
-    for_pref-->get_armington_agg
-    get_armington_agg-->consumption
+    domestic_consumption --> get_armington_agg
+    tariffed_imports --> get_armington_agg
+    sub_rate --> get_armington_agg
+    dom_pref --> get_armington_agg
+    for_pref --> get_armington_agg
+    get_armington_agg --> consumption
 
-    labor-->|t+1|get_utility
-    consumption-->get_utility
-    alpha-->get_utility
-    get_utility-->utilty
+    labor --> |t+1|get_utility
+    consumption --> get_utility
+    alpha --> get_utility
+    get_utility --> utilty
 
-    utility-->get_social_welfare
-    rho-->get_social_welfare
-    Delta-->get_social_welfare
-    activity_timestep-->get_social_welfare
-    get_social_welfare-->social_welfare
+    utility --> get_social_welfare
+    rho --> get_social_welfare
+    Delta --> get_social_welfare
+    activity_timestep --> get_social_welfare
+    get_social_welfare --> social_welfare
 
-    gov_balance_tmp-->eq7
-    Delta-->eq7
-    trade-->|exports|eq7
-    trade-->|imports|eq7
-    eq7-->gov_balance
+    gov_balance_tmp --> eq7
+    Delta --> eq7
+    trade --> |exports|eq7
+    trade --> |imports|eq7
+    eq7 --> gov_balance
 
-    Phi_T-->get_global_temperature
-    global_temperature-->|t+1|get_global_temperature
-    B_T-->get_global_temperature
-    F_2x-->get_global_temperature
-    global_carbon_mass-->|"[0]"|m_at
-    m_at["global_carbon_mass_atmosphere (m_at)"]-->get_global_temperature
-    M_AT_1750-->get_global_temperature
-    global_exogenous_emissions-->get_global_temperature
-    get_global_temperature-->global_temperature
+    Phi_T --> get_global_temperature
+    global_temperature --> |t+1|get_global_temperature
+    B_T --> get_global_temperature
+    F_2x --> get_global_temperature
+    global_carbon_mass --> |"[0]"|m_at
+    m_at["global_carbon_mass_atmosphere (m_at)"] --> get_global_temperature
+    M_AT_1750 --> get_global_temperature
+    global_exogenous_emissions --> get_global_temperature
+    get_global_temperature --> global_temperature
 
-    intensity-->|t+1|get_aux_m
-    mitigation_rate-->get_aux_m
-    production-->get_aux_m
-    land_emissions-->get_aux_m
-    get_aux_m-->aux_m
+    intensity --> |t+1|get_aux_m
+    mitigation_rate --> get_aux_m
+    production --> get_aux_m
+    land_emissions --> get_aux_m
+    get_aux_m --> aux_m
 
-    Phi_M-->get_global_carbon_mass
-    global_carbon_mass-->|t+1|get_global_carbon_mass
-    B_M-->get_global_carbon_mass
-    aux_m-->get_global_carbon_mass
-    get_global_carbon_mass-->global_carbon_mass
+    Phi_M --> get_global_carbon_mass
+    global_carbon_mass --> |t+1|get_global_carbon_mass
+    B_M --> get_global_carbon_mass
+    aux_m --> get_global_carbon_mass
+    get_global_carbon_mass --> global_carbon_mass
 
-    delta_K-->get_capital_depreciation
-    Delta-->get_capital_depreciation
-    get_capital_depreciation-->capital_depreciation
+    delta_K --> get_capital_depreciation
+    Delta --> get_capital_depreciation
+    get_capital_depreciation --> capital_depreciation
 
-    capital_depreciation-->get_capital
-    capital-->|t+1|get_capital
-    Delta-->get_capital
-    investment-->get_capital
-    get_capital-->capital
+    capital_depreciation --> get_capital
+    capital --> |t+1|get_capital
+    Delta --> get_capital
+    investment --> get_capital
+    get_capital --> capital
 
-    labor-->|t+1|get_labor
-    L_a-->get_labor
-    l_g-->get_labor
-    get_labor-->labor
+    labor --> |t+1|get_labor
+    L_a --> get_labor
+    l_g --> get_labor
+    get_labor --> labor
 
-    production_factor-->|t+1|get_production_factor
-    g_A-->get_production_factor
-    delta_A-->get_production_factor
-    Delta-->get_production_factor
-    activity_timestep-->get_production_factor
-    get_production_factor-->production_factor
+    production_factor --> |t+1|get_production_factor
+    g_A --> get_production_factor
+    delta_A --> get_production_factor
+    Delta --> get_production_factor
+    activity_timestep --> get_production_factor
+    get_production_factor --> production_factor
 
-    intensity-->|t+1|get_carbon_intensity
-    g_sigma-->get_carbon_intensity
-    delta_sigma-->get_carbon_intensity
-    Delta-->get_carbon_intensity
-    activity_timestep-->get_carbon_intensity
-    get_carbon_intensity-->intensity
+    intensity --> |t+1|get_carbon_intensity
+    g_sigma --> get_carbon_intensity
+    delta_sigma --> get_carbon_intensity
+    Delta --> get_carbon_intensity
+    activity_timestep --> get_carbon_intensity
+    get_carbon_intensity --> intensity
 
-    utility-->reward{"reward"}
+    utility --> reward{"reward"}
 ```
