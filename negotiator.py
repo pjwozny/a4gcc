@@ -65,6 +65,16 @@ class NoProtocol(BaseProtocol):
     def __init__(self, num_regions, num_discrete_action_levels) -> None:
         self.stages = []
         super().__init__(num_regions, num_discrete_action_levels)
+    
+    def reset(self):
+        self.minimum_mitigation_rate_all_regions = np.zeros(self.num_regions)
+
+    def get_protocol_state(self):
+        protocol_state = {
+            "minimum_mitigation_rate_all_regions": self.minimum_mitigation_rate_all_regions
+            / self.num_discrete_action_levels,
+        }
+        return protocol_state
 
 
 class BilateralNegotiatorWithOnlyTariff(BaseProtocol):

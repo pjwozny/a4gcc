@@ -6,7 +6,7 @@ import pandas as pd
 import os
 from fixed_paths import PUBLIC_REPO_DIR
 
-def construct_stacked_bar_chart(global_states, wandb,
+def construct_stacked_bar_chart(global_states,
                             num_discrete_actions = 10, 
                             field = "mitigation_rate_all_regions"):
 
@@ -52,7 +52,7 @@ def construct_stacked_bar_chart(global_states, wandb,
     plt.ylabel(f"# of Countries of a Given {y_axis_field}")
     plt.xlabel("Timesteps")
     plt.title(f"{field} Distribution")
-    wandb.log({f"{y_axis_field} Counts Across Time":plt})
+    return plt
        
 
 

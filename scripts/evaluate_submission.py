@@ -102,12 +102,12 @@ def get_imports(framework, experiment_id):
     assert framework is not None
     if framework == "rllib":
         from train_with_rllib import (
-            create_trainer,
             fetch_episode_states,
             fetch_episode_states_freerider,
             fetch_episode_states_tariff,
             load_model_checkpoints,
         )
+        from train import create_trainer
     elif framework == "warpdrive":
         from train_with_warp_drive import (
             create_trainer,
@@ -440,9 +440,7 @@ def perform_evaluation(
 
                     # Create trainer object
                     try:
-                        trainer, _ = create_trainer(
-                            run_config, source_dir=results_directory, seed=eval_seed
-                        )
+                        trainer = create_trainer(run_config, seed=eval_seed)
 
                         # Load model checkpoints
                         try:
