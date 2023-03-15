@@ -25,7 +25,6 @@ import numpy as np
 from random import choice
 
 import yaml
-from run_unittests import import_class_from_path
 from train import get_rllib_config
 from environment_wrapper import EnvWrapper
 from desired_outputs import desired_outputs
@@ -144,45 +143,6 @@ def recursive_list_to_np_array(dictionary):
     raise AssertionError
 
 
-class EnvWrapper(MultiAgentEnv):
-    """
-    The environment wrapper class.
-    """
-
-    def __init__(self, env_config=None):
-        env_config_copy = env_config.copy()
-        if env_config_copy is None:
-            env_config_copy = {}
-        source_dir = env_config_copy.get("source_dir", None)
-        # Remove source_dir key in env_config if it exists
-        if "source_dir" in env_config_copy:
-            del env_config_copy["source_dir"]
-        if source_dir is None:
-            source_dir = PUBLIC_REPO_DIR
-        source_dir = PUBLIC_REPO_DIR
-        assert isinstance(env_config_copy, dict)
-        print(env_config_copy)
-        self.env = import_class_from_path("Rice", os.path.join(source_dir, "rice.py"))(
-            **env_config_copy
-        )
-
-        self.action_space = self.env.action_space
-
-        self.observation_space = recursive_obs_dict_to_spaces_dict(self.env.reset())
-
-    def reset(self):
-        """Reset the env."""
-        obs = self.env.reset()
-        return recursive_list_to_np_array(obs)
-
-    def step(self, actions=None):
-        """Step through the env."""
-        assert actions is not None
-        assert isinstance(actions, dict)
-        obs, rew, done, info = self.env.step(actions)
-        return recursive_list_to_np_array(obs), rew, done, info
-
-
 def get_rllib_config_(exp_run_config=None, env_class=None, seed=None):
     """
     Reference: https://docs.ray.io/en/latest/rllib-training.html
@@ -280,7 +240,6 @@ def load_model_checkpoints(trainer_obj=None, save_directory=None, ckpt_idx=-1):
         policy_name = file.stem.split("_")[0]
         policy_name_files[policy_name].append(file)
 
-    print(policy_name_files)
     assert len(policy_name_files) == len(trainer_obj.config["multiagent"]["policies"])
 
     model_params = trainer_obj.get_weights()
@@ -328,6 +287,13 @@ def create_trainer(exp_run_config=None, source_dir=None, results_dir=None, seed=
     return rllib_trainer, results_save_dir
 
 
+def part_of(state, global_state):
+    if state not in global_state:
+        print(f"WARNING: {state} not part of global state, removing from evaluation")
+        return False
+    return True
+
+
 def fetch_episode_states(trainer_obj=None, episode_states=None):
     """
     Helper function to rollout the env and fetch env states for an episode.
@@ -344,6 +310,8 @@ def fetch_episode_states(trainer_obj=None, episode_states=None):
     obs = env_object.reset()
 
     env = env_object.env
+
+    episode_states = [s for s in episode_states if part_of(s, env.global_state)]
 
     for state in episode_states:
         assert state in env.global_state, f"{state} is not in global state!"
@@ -419,6 +387,7 @@ def fetch_episode_states_freerider(trainer_obj=None, episode_states=None):
         obs = env_object.reset()
 
         env = env_object.env
+        episode_states = [s for s in episode_states if part_of(s, env.global_state)]
         
         #choose one agent to be the freerider
         fr_id = np.random.randint(0,env.num_agents) 
@@ -580,6 +549,8 @@ def fetch_episode_states_tariff(trainer_obj=None, episode_states=None):
             obs = env_object.reset()
 
             env = env_object.env
+
+            episode_states = [s for s in episode_states if part_of(s, env.global_state)]
 
             for state in episode_states:
                 assert state in env.global_state, f"{state} is not in global state!"
