@@ -67,6 +67,89 @@ class NoProtocol(BaseProtocol):
         super().__init__(num_regions, num_discrete_action_levels)
 
 
+class DirectSanction(BaseProtocol):
+    """This protocol directly punishes agents based on their mitigation rate.
+    There is no negotiation involved. Actions are modified such that states
+    that do not mitigate max will be max sanctioned in tariff and import.
+    Vice versa, states that do mitigate max will receive max bonus.
+    """
+    def __init__(self, num_regions, num_discrete_action_levels) -> None:
+        self.stages = []
+        super().__init__(num_regions, num_discrete_action_levels)
+
+    def check_do_step(self, rice_actions, protocol_actions) -> Tuple[bool, dict]:
+        to_punish = []
+        for region_id, actions in rice_actions.items():
+            if not actions[1] == 9:
+                to_punish.append(region_id)
+
+        to_punish_import_indices = [e + 3 for e in to_punish]
+        to_punish_tariff_indices = [e + 30 for e in to_punish]
+
+        rice_actions_modified = {}
+        for region_id, actions in rice_actions.items():
+            actions_modified = actions.copy()
+            actions_modified[3:30] = 0
+            actions_modified[to_punish_import_indices] = 9
+            actions_modified[30:] = 9
+            actions_modified[to_punish_tariff_indices] = 0
+            rice_actions_modified[region_id] = actions_modified
+
+        return True, rice_actions_modified
+
+    def get_partial_action_mask(self):
+        """
+        Generate action masks.
+        """
+        action_mask_dict = defaultdict(dict)
+        mask = [0] * (self.num_discrete_action_levels * self.num_regions)
+        for region_id in range(self.num_regions):
+            action_mask_dict[region_id]["tariff"] = mask
+            action_mask_dict[region_id]["import"] = mask
+
+        return action_mask_dict
+    
+
+class DirectProportionalSanction(BaseProtocol):
+    """This protocol directly punishes agents based on their mitigation rate.
+    There is no negotiation involved. Actions are modified such that states
+    that do not mitigate max will be max sanctioned in tariff and import.
+    Vice versa, states that do mitigate max will receive max bonus.
+    """
+    def __init__(self, num_regions, num_discrete_action_levels) -> None:
+        self.stages = []
+        super().__init__(num_regions, num_discrete_action_levels)
+
+    def check_do_step(self, rice_actions, protocol_actions) -> Tuple[bool, dict]:
+        import_actions = []
+        tariff_actions = []
+        for region_id, actions in rice_actions.items():
+            mitigation_rate = int(actions[1])
+            import_actions.append(mitigation_rate)
+            tariff_actions.append(self.num_discrete_action_levels - mitigation_rate - 1)
+
+        rice_actions_modified = {}
+        for region_id, actions in rice_actions.items():
+            actions_modified = actions.copy()
+            actions_modified[3:30] = import_actions
+            actions_modified[30:] = tariff_actions
+            rice_actions_modified[region_id] = actions_modified
+
+        return True, rice_actions_modified
+
+    def get_partial_action_mask(self):
+        """
+        Generate action masks.
+        """
+        action_mask_dict = defaultdict(dict)
+        mask = [0] * (self.num_discrete_action_levels * self.num_regions)
+        for region_id in range(self.num_regions):
+            action_mask_dict[region_id]["tariff"] = mask
+            action_mask_dict[region_id]["import"] = mask
+
+        return action_mask_dict
+
+
 class BilateralNegotiatorWithOnlyTariff(BaseProtocol):
 
     """
