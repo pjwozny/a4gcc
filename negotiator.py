@@ -23,7 +23,7 @@ class BaseProtocol(ABC):
         self.action_offsets = {i: o for i, o in enumerate(np.cumsum(action_lengths))}
         self.num_stages = len(self.stages)
 
-    def check_do_step(self, rice_actions, protocol_actions) -> Tuple[bool, dict]:
+    def check_do_step(self, rice_actions: dict, protocol_actions: dict) -> Tuple[bool, dict]:
         if self.stage_idx == self.num_stages:
             self.stage_idx = 0
             return True, rice_actions
