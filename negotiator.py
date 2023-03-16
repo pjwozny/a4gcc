@@ -57,7 +57,7 @@ class BaseProtocol(ABC):
     def get_protocol_state(self) -> Dict[str, np.ndarray]:
         return {}
 
-    def get_pub_priv_features(selft) -> Tuple[list, list]:
+    def get_pub_priv_features(self) -> Tuple[list, list]:
         return [], []
 
 
