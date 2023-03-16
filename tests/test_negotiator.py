@@ -7,9 +7,18 @@ from negotiator import (
     BasicClub,
     BasicClubDiscreteDefect,
     BilateralNegotiator,
+    DirectSanction,
+    DirectProportionalSanction,
 )
 
-PROTOCOLS = [NoProtocol, BilateralNegotiator, BasicClub, BasicClubDiscreteDefect]
+PROTOCOLS = [
+    NoProtocol,
+    BilateralNegotiator,
+    BasicClub,
+    BasicClubDiscreteDefect,
+    DirectSanction,
+    DirectProportionalSanction,
+]
 
 
 @pytest.mark.parametrize("protocol_class", PROTOCOLS)
