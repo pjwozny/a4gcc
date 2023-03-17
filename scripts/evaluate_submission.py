@@ -285,6 +285,16 @@ def compute_metrics(fetch_episode_states, trainer, framework, submission_file, l
         comment = "Could not obtain an episode rollout!"
         eval_metrics = {}
 
+    data = [(eval_metrics["economic_index"], eval_metrics["climate_index"])]
+    table = wandb.Table(data=data, columns=["economic_index", "climate_index"])
+    wandb.log(
+        {
+            "Economic_Index_vs_Climate_Index": wandb.plot.scatter(
+                table, "economic_index", "climate_index"
+            )
+        }
+    )
+
     if log_config and log_config["enabled"]:
         # attach submission file as artifact (needs to be named after the nego class)
         artifact = wandb.Artifact("submission", type="model")
