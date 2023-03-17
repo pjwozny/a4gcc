@@ -31,6 +31,8 @@ from negotiator import (
     BasicClubDiscreteDefectClusterProposals,
     BasicClub,
     BasicClubClusterProposals,
+    BasicClubDiscreteDefectWithPunishmentAndFreeTrade,
+    BasicClubDiscreteDefectWithPunishment
 )
 
 PROTOCOLS = {
@@ -44,6 +46,8 @@ PROTOCOLS = {
     "BasicClubDiscreteDefect": BasicClubDiscreteDefect,
     "BasicClubDiscreteDefectClusterProposals": BasicClubDiscreteDefectClusterProposals,
     "BasicClubClusterProposals": BasicClubClusterProposals,
+    "BasicClubDiscreteDefectWithPunishmentAndFreeTrade":BasicClubDiscreteDefectWithPunishmentAndFreeTrade,
+    "BasicClubDiscreteDefectWithPunishment":BasicClubDiscreteDefectWithPunishment
 }
 
 from rice_helpers import (
