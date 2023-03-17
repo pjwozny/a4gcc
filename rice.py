@@ -22,6 +22,8 @@ sys.path = [_PUBLIC_REPO_DIR] + sys.path
 from negotiator import (
     BaseProtocol,
     NoProtocol,
+    DirectSanction,
+    DirectProportionalSanction,
     BilateralNegotiatorWithOnlyTariff,
     BilateralNegotiatorWithTariff,
     BilateralNegotiator,
@@ -33,6 +35,8 @@ from negotiator import (
 
 PROTOCOLS = {
     "NoProtocol": NoProtocol,
+    "DirectSanction": DirectSanction,
+    "DirectProportionalSanction": DirectProportionalSanction,
     "BilateralNegotiatorWithOnlyTariff": BilateralNegotiatorWithOnlyTariff,
     "BilateralNegotiatorWithTariff": BilateralNegotiatorWithTariff,
     "BilateralNegotiator": BilateralNegotiator,
