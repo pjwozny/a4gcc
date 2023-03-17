@@ -1390,11 +1390,12 @@ class BasicClubDiscreteDefectWithPunishmentAndFreeTrade(BaseProtocol):
             "defect_decisions": self.defect_decisions,
             "proposal_decisions": self.proposal_decisions,
             "received_proposal_decisions": self.proposal_decisions.T,
+            "defectors":self.defectors
         }
         return protocol_state
 
     def get_pub_priv_features(self):
-        public_features = ["stage", "proposed_mitigation_rate", "minimum_mitigation_rate_all_regions", "defect_decisions"]
+        public_features = ["stage", "proposed_mitigation_rate", "minimum_mitigation_rate_all_regions", "defect_decisions", "defectors"]
         private_features = [
             # "proposal_decisions",
             "received_proposal_decisions",
@@ -1562,11 +1563,12 @@ class BasicClubDiscreteDefectWithPunishment(BaseProtocol):
             "defect_decisions": self.defect_decisions,
             "proposal_decisions": self.proposal_decisions,
             "received_proposal_decisions": self.proposal_decisions.T,
+            "defectors":self.defectors
         }
         return protocol_state
 
     def get_pub_priv_features(self):
-        public_features = ["stage", "proposed_mitigation_rate", "minimum_mitigation_rate_all_regions", "defect_decisions"]
+        public_features = ["stage", "proposed_mitigation_rate", "minimum_mitigation_rate_all_regions", "defect_decisions", "defectors"]
         private_features = [
             # "proposal_decisions",
             "received_proposal_decisions",
