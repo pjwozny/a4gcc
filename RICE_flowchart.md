@@ -105,13 +105,28 @@ flowchart LR
     get_social_welfare["utility / pow(1 + rho, Delta * activity_timestep)"]
     eq7["gov_balance_tmp + Delta * (sum(exports) - sum(imports))"]
     get_global_temperature["dot(Phi_T, temperature) + dot(B_T, F_2x * log(m_at / M_AT_1750) / log(2) + exogenous_emissions)"]
-    get_aux_m["intensity * (1 - mitigation_rate) * production + land_emissions"]
+    get_aux_m["intensity * (1 - mitigation_rate) * production + global_land_emissions"]
     get_global_carbon_mass["dot(Phi_M, carbon_mass) + dot(B_M, aux_m)"]
     get_capital_depreciation["pow(1 - delta_K, Delta)"]
     get_capital["capital_depreciation * capital + Delta * investment"]
     get_labor["labor * pow((1 + L_a) / (1 + labor), l_g)"]
     get_production_factor["production_factor * (exp(0.0033) + g_A * exp(-delta_A * Delta * (activity_timestep - 1)))"]
     get_carbon_intensity["intensity * exp(-g_sigma * pow(1 - delta_sigma, delta * (activity_timestep - 1)) * Delta)"]
+
+    T_AT_0 --> |initialise|global_temperature
+    T_LO_0 --> |initialise|global_temperature
+
+    M_AT_0 --> |initialise|global_carbon_mass
+    M_UP_0 --> |initialise|global_carbon_mass
+    M_LO_0 --> |initialise|global_carbon_mass
+
+    K_0 --> |initialise|capital
+
+    L_0 --> |initialise|labor
+
+    A_0 --> |initialise|production_factor
+
+    sigma_0 --> |initialise|intensity
 
     E_L0 --> get_land_emissions
     delta_EL --> get_land_emissions
@@ -236,7 +251,7 @@ flowchart LR
     intensity --> |t+1|get_aux_m
     mitigation_rate --> get_aux_m
     production --> get_aux_m
-    land_emissions --> get_aux_m
+    global_land_emissions --> get_aux_m
     get_aux_m --> aux_m
 
     Phi_M --> get_global_carbon_mass
