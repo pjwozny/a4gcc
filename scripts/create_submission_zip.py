@@ -82,9 +82,9 @@ def prepare_submission(results_dir: Path) -> Path:
         yaml.dump(run_config, fp, default_flow_style=False)
 
     # Create the backwards compatible submission file and delete the temporary copy
-    submission_file = Path("submissions") / "backwards_compatible" / results_dir.name
-    shutil.make_archive(submission_file, "zip", results_dir_copy)
-    print("NOTE: The backwards compatible submission file is created at:\t", submission_file.with_suffix(".zip"))
+    submission_file_bc = Path("submissions") / "backwards_compatible" / results_dir.name
+    shutil.make_archive(submission_file_bc, "zip", results_dir_copy)
+    print("NOTE: The backwards compatible submission file is created at:\t", submission_file_bc.with_suffix(".zip"))
     
     # delete temporary directory
     shutil.rmtree(results_dir_copy)
