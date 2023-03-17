@@ -132,6 +132,7 @@ flowchart LR
     intensity --> |t+1|get_mitigation_cost
     get_mitigation_cost --> mitigation_cost
 
+    global_temperature --> |atmosphere|t_at
     t_at["temperature_atmosphere (t_at)"] --> |t+1|get_damages
     a_1 --> get_damages
     a_2 --> get_damages
@@ -208,7 +209,7 @@ flowchart LR
     labor --> |t+1|get_utility
     consumption --> get_utility
     alpha --> get_utility
-    get_utility --> utilty
+    get_utility --> utility
 
     utility --> get_social_welfare
     rho --> get_social_welfare
@@ -226,7 +227,7 @@ flowchart LR
     global_temperature --> |t+1|get_global_temperature
     B_T --> get_global_temperature
     F_2x --> get_global_temperature
-    global_carbon_mass --> |"[0]"|m_at
+    global_carbon_mass --> |atmosphere|m_at
     m_at["global_carbon_mass_atmosphere (m_at)"] --> get_global_temperature
     M_AT_1750 --> get_global_temperature
     global_exogenous_emissions --> get_global_temperature
