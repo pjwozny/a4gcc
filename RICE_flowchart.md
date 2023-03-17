@@ -1,10 +1,11 @@
 ```mermaid
 flowchart LR
     subgraph actions
-    desired_imports
+    mitigation_rate
     max_export
-    tariffs
     saving
+    desired_imports
+    tariffs
     end
     subgraph constants
     num_regions
