@@ -365,11 +365,11 @@ class Rice:
 
         # obtain separate actions dicts
         rice_actions, protocol_actions = self.split_actions(actions)
-        protocol_done, rice_actions = self.protocol.check_do_step(
-            rice_actions, protocol_actions
-        )
 
-        if not protocol_done:
+        # perform protocol stepp
+        rice_actions = self.protocol.step(rice_actions, protocol_actions)
+
+        if not self.protocol.is_done():
             protocol_state = self.protocol.get_protocol_state()
             for key, value in protocol_state.items():
                 self.set_global_state(key, value, self.timestep)
@@ -507,14 +507,22 @@ class Rice:
     def generate_action_mask(self) -> Dict[int, np.ndarray]:
         action_mask_dict = {}
         partial_action_mask = self.protocol.get_partial_action_mask()
+        a = 0
         for region_id in range(self.num_regions):
             assert set(partial_action_mask[region_id].keys()).issubset(self.action_names)
             mask = []
-            for action_name, length in self.action_mask_template:
-                if action_name in partial_action_mask[region_id]:
-                    mask.extend(partial_action_mask[region_id][action_name])
-                else:
-                    mask.extend([1] * length)
+            if self.protocol.is_done():
+                for action_name, length in self.action_mask_template:
+                    if action_name in partial_action_mask[region_id]:
+                        mask.extend(partial_action_mask[region_id][action_name])
+                    else:
+                        mask.extend([1] * length)
+            else:
+                for action_name, length in self.action_mask_template:
+                    if action_name == "protocol":
+                        mask.extend(partial_action_mask[region_id][action_name])
+                    else:
+                        mask.extend([0] * length)
 
             action_mask_dict[region_id] = np.array(mask, dtype=self.int_dtype)
 

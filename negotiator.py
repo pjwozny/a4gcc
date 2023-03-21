@@ -29,16 +29,19 @@ class BaseProtocol(ABC):
         self.action_offsets = {i: o for i, o in enumerate(np.cumsum(action_lengths))}
         self.num_stages = len(self.stages)
 
-    def check_do_step(self, rice_actions: dict, protocol_actions: dict) -> Tuple[bool, dict]:
+    def step(self, rice_actions: dict, protocol_actions: dict) -> dict:
         if self.stage_idx == self.num_stages:
+            self.done = True
             self.stage_idx = 0
-            return True, rice_actions
-
-        stage_actions = self.split_actions(protocol_actions)
-        self.stages[self.stage_idx]["function"](stage_actions)
-        self.stage_idx += 1
-
-        return False, rice_actions
+        else:
+            self.done = False
+            stage_actions = self.split_actions(protocol_actions)
+            self.stages[self.stage_idx]["function"](stage_actions)
+            self.stage_idx += 1
+        return rice_actions
+    
+    def is_done(self) -> bool:
+        return self.done
 
     def split_actions(self, actions) -> Dict[int, np.ndarray]:
         end_idx = self.action_offsets[self.stage_idx]
@@ -47,15 +50,6 @@ class BaseProtocol(ABC):
 
         start_idx = self.action_offsets[self.stage_idx - 1]
         return {k: v[start_idx:end_idx] for k, v in actions.items()}
-
-    def check_done_restart(self) -> bool:
-        if self.stage_idx == self.num_stages:
-            self.stage_idx = 0
-            return True
-        return False
-
-    def get_partial_action_mask(self) -> Dict[int, Dict[str, list]]:
-        return defaultdict(dict)
 
     def reset(self) -> None:
         pass
@@ -66,6 +60,24 @@ class BaseProtocol(ABC):
     def get_pub_priv_features(self) -> Tuple[list, list]:
         return [], []
 
+    def get_partial_action_mask(self) -> Dict[int, Dict[str, list]]:
+        action_mask_dict = defaultdict(dict)
+        rice_mask_dict = self.get_rice_action_mask()
+        for region_id in range(self.num_regions):
+            protocol_mask = []
+            for stage_num, stage in enumerate(self.stages):
+                num_actions = sum(stage["action_space"])
+                if stage_num == self.stage_idx:
+                    protocol_mask.extend([1] * num_actions)
+                else:
+                    protocol_mask.extend([0] * num_actions)
+            action_mask_dict[region_id]["protocol"] = protocol_mask
+            action_mask_dict[region_id].update(rice_mask_dict[region_id])
+
+        return action_mask_dict
+    
+    def get_rice_action_mask(self) -> Dict[int, Dict[str, list]]:
+        return defaultdict(dict)
 
 class NoProtocol(BaseProtocol):
     def __init__(self, num_regions, num_discrete_action_levels) -> None:
@@ -103,7 +115,7 @@ class DirectSanction(BaseProtocol):
 
         return True, rice_actions_modified
 
-    def get_partial_action_mask(self):
+    def get_rice_action_mask(self):
         """
         Generate action masks.
         """
@@ -143,7 +155,7 @@ class DirectProportionalSanction(BaseProtocol):
 
         return True, rice_actions_modified
 
-    def get_partial_action_mask(self):
+    def get_rice_action_mask(self):
         """
         Generate action masks.
         """
@@ -1459,7 +1471,7 @@ class BasicClubDiscreteDefectWithPunishmentAndFreeTrade(BaseProtocol):
         self.minimum_mitigation_rate_all_regions = self.minimum_mitigation_rate_all_regions * (1 - self.defect_decisions)
 
 
-    def get_partial_action_mask(self):
+    def get_rice_action_mask(self):
         """
         Generate action masks.
         """
@@ -1632,7 +1644,7 @@ class BasicClubDiscreteDefectWithPunishment(BaseProtocol):
         self.minimum_mitigation_rate_all_regions = self.minimum_mitigation_rate_all_regions * (1 - self.defect_decisions)
 
 
-    def get_partial_action_mask(self):
+    def get_rice_action_mask(self):
         """
         Generate action masks.
         """
@@ -1797,7 +1809,7 @@ class BasicClubDiscreteDefect(BaseProtocol):
         self.minimum_mitigation_rate_all_regions = self.minimum_mitigation_rate_all_regions * (1 - self.defect_decisions)
 
 
-    def get_partial_action_mask(self):
+    def get_rice_action_mask(self):
         """
         Generate action masks.
         """
@@ -1937,7 +1949,7 @@ class BasicClub(BaseProtocol):
         mmrar = (self.proposed_mitigation_rate * self.proposal_decisions).max(axis=1)
         self.minimum_mitigation_rate_all_regions = mmrar
 
-    def get_partial_action_mask(self):
+    def get_rice_action_mask(self):
         """
         Generate action masks.
         """
@@ -2080,7 +2092,7 @@ class BilateralNegotiator(BaseProtocol):
 
         self.minimum_mitigation_rate_all_regions = mmrar
 
-    def get_partial_action_mask(self):
+    def get_rice_action_mask(self):
         """
         Generate action masks.
         """
