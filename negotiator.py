@@ -3,6 +3,12 @@ from collections import defaultdict
 from typing import Dict, Tuple
 
 import numpy as np
+import torch
+import torch.nn as nn
+from gym.spaces import Dict as gym_dict
+from ray.rllib.models import ModelCatalog
+from ray.rllib.models.torch.torch_modelv2 import TorchModelV2
+from ray.rllib.utils.typing import TensorType
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
 
@@ -2089,3 +2095,75 @@ class BilateralNegotiator(BaseProtocol):
             action_mask_dict[region_id]["mitigation"] = mitigation_mask
 
         return action_mask_dict
+
+
+class TorchLinaerMasking(TorchModelV2, nn.Module):
+    """Model that handles simple discrete action masking.
+
+    This assumes the outputs are logits for a single Categorical action dist.
+    Getting this to work with a more complex output (e.g., if the action space
+    is a tuple of several distributions) is also possible but left as an
+    exercise to the reader.
+    """
+
+    def __init__(
+        self,
+        obs_space,
+        action_space,
+        num_outputs,
+        model_config,
+        name,
+        fc_dims,
+    ):
+        orig_space = getattr(obs_space, "original_space", obs_space)
+        assert (
+            isinstance(orig_space, gym_dict)
+            and "action_mask" in orig_space.spaces
+            and "features" in orig_space.spaces
+        )
+
+        TorchModelV2.__init__(
+            self, obs_space, action_space, num_outputs, model_config, name
+        )
+        nn.Module.__init__(self)
+
+        self.num_outputs = num_outputs
+
+        prev_layer_size = orig_space["features"].shape[0]
+        layers = []
+
+        for fc_dim in fc_dims:
+            layers.append(nn.Linear(prev_layer_size, fc_dim))
+            layers.append(nn.ReLU())
+            prev_layer_size = fc_dim
+
+
+        self._hidden_layers = nn.Sequential(*layers)
+
+        self._logits = nn.Linear(fc_dims[-1], self.num_outputs)
+
+        self._value_branch = nn.Linear(fc_dims[-1], 1)
+
+        # Holds the current "base" output (before logits layer).
+        self._features = None
+
+    def forward(self, input_dict, state, seq_lens):
+        # Extract the available actions tensor from the observation.
+        action_mask = input_dict["obs"]["action_mask"]
+
+        # Compute the unmasked logits.
+        self._features = self._hidden_layers(input_dict["obs"]["features"])
+        logits = self._logits(self._features)
+
+        # Convert action_mask into a [0.0 || -inf]-type mask.
+        inf_mask = torch.clamp(torch.log(action_mask), min=-3.4e38)
+        masked_logits = logits + inf_mask
+
+        # Return masked logits.
+        return masked_logits, state
+    
+    def value_function(self) -> TensorType:
+        assert self._features is not None, "must call forward() first"
+        return self._value_branch(self._features).squeeze(1)
+
+ModelCatalog.register_custom_model("torch_linear_masking", TorchLinaerMasking)
