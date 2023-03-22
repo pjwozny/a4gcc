@@ -32,8 +32,10 @@ sys.path.append(PUBLIC_REPO_DIR)
 from scripts.environment_wrapper import EnvWrapper
 from scripts.torch_models import TorchLinear
 from scripts.evaluate_submission import perform_evaluation
+from negotiator import TorchLinearMasking
 
 ModelCatalog.register_custom_model("torch_linear", TorchLinear)
+ModelCatalog.register_custom_model("torch_linear_masking", TorchLinearMasking)
 
 
 def train(run_config, save_dir):

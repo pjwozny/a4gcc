@@ -2109,7 +2109,7 @@ class BilateralNegotiator(BaseProtocol):
         return action_mask_dict
 
 
-class TorchLinaerMasking(TorchModelV2, nn.Module):
+class TorchLinearMasking(TorchModelV2, nn.Module):
     """Model that handles simple discrete action masking.
 
     This assumes the outputs are logits for a single Categorical action dist.
@@ -2178,4 +2178,4 @@ class TorchLinaerMasking(TorchModelV2, nn.Module):
         assert self._features is not None, "must call forward() first"
         return self._value_branch(self._features).squeeze(1)
 
-ModelCatalog.register_custom_model("torch_linear_masking", TorchLinaerMasking)
+ModelCatalog.register_custom_model("torch_linear_masking", TorchLinearMasking)
