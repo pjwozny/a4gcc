@@ -43,6 +43,9 @@ class BaseProtocol(ABC):
     def is_done(self) -> bool:
         return self.done
 
+    def rice_step_next(self) -> bool:
+        return self.stage_idx == self.num_stages
+
     def split_actions(self, actions) -> Dict[int, np.ndarray]:
         end_idx = self.action_offsets[self.stage_idx]
         if self.stage_idx == 0:

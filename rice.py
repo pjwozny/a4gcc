@@ -507,11 +507,10 @@ class Rice:
     def generate_action_mask(self) -> Dict[int, np.ndarray]:
         action_mask_dict = {}
         partial_action_mask = self.protocol.get_partial_action_mask()
-        a = 0
         for region_id in range(self.num_regions):
             assert set(partial_action_mask[region_id].keys()).issubset(self.action_names)
             mask = []
-            if self.protocol.is_done():
+            if self.protocol.rice_step_next():
                 for action_name, length in self.action_mask_template:
                     if action_name in partial_action_mask[region_id]:
                         mask.extend(partial_action_mask[region_id][action_name])
