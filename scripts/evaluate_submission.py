@@ -174,6 +174,8 @@ def compute_metrics(fetch_episode_states, trainer, framework, submission_file, l
 
     # Fetch all the desired outputs to compute various metrics.
     desired_outputs = list(_METRICS_TO_LABEL_DICT.keys())
+    # Add auxiliary outputs required for processing
+    required_outputs = desired_outputs + ["activity_timestep"]
 
     episode_states = {}
     eval_metrics = {}
@@ -218,6 +220,13 @@ def compute_metrics(fetch_episode_states, trainer, framework, submission_file, l
                     feature_values[episode_id] = episode_states[episode_id][feature][
                         -1, 0
                     ]
+
+            elif feature == "gross_output_all_regions":
+                for episode_id in range(num_episodes):
+                    activity_timestep = episode_states[episode_id]["activity_timestep"]
+                    activity_index = np.append(1.0, np.diff(activity_timestep.squeeze()))
+                    activity_index = [np.isclose(v, 1.0) for v in activity_index]
+                    feature_values[episode_id] = np.sum(episode_states[episode_id]["gross_output_all_regions"][activity_index])
 
             else:
                 for episode_id in range(num_episodes):
