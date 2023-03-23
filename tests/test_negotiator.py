@@ -10,7 +10,8 @@ from negotiator import (
     DirectSanction,
     DirectProportionalSanction,
     BasicClubDiscreteDefectWithPunishmentAndFreeTrade,
-    BasicClubDiscreteDefectWithPunishment
+    BasicClubDiscreteDefectWithPunishment,
+    BasicClubHardDefectWithPunishmentAndFreeTrade
 )
 
 PROTOCOLS = [
@@ -21,7 +22,8 @@ PROTOCOLS = [
     DirectSanction,
     DirectProportionalSanction,
     BasicClubDiscreteDefectWithPunishmentAndFreeTrade,
-    BasicClubDiscreteDefectWithPunishment
+    BasicClubDiscreteDefectWithPunishment,
+    BasicClubHardDefectWithPunishmentAndFreeTrade
 ]
 
 

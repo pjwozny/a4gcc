@@ -1687,6 +1687,181 @@ class BasicClubDiscreteDefectWithPunishment(BaseProtocol):
             action_mask_dict[region_id]["mitigation"] = mitigation_mask
 
         return action_mask_dict
+    
+class BasicClubHardDefectWithPunishmentAndFreeTrade(BaseProtocol):
+
+    """
+    Basic Climate Club. Works as follows:
+    Each country proposes 1 value mitigation level, the level they think others should aspire to.
+    this value is either accepted or rejected by other countries. 
+    Countries commit to the max that they accept. 
+    They tariff those in lower mitigation clubs than themselves and give bonus to those in the same club as themselves.
+
+    Action masks:
+    - mitigation
+    - tariffs, inverse tarrifs within club, normal tariffs 
+
+    Attributes:
+          rice: instance of RICE-N model
+          stages (list(dict)): function steps that this negotiator class performs,
+                               each contains a function and number of actions
+                               used by the function
+          num_negotiation_stages (int): number of stages in total
+
+    """
+
+    def __init__(self, num_regions, num_discrete_action_levels):
+        """
+        Defines necessary parameters for communication
+        with rice class
+
+        Args:
+            Rice: instance of RICE-N model
+        """
+        self.stages = [
+            {
+                "function": self.proposal_step,
+                "action_space": [num_discrete_action_levels],
+            },
+            {
+                "function": self.evaluation_step,
+                "action_space": [2] * num_regions,
+            },
+            {
+                "function": self.defect_step,
+                "action_space": [2]
+            }
+        ]
+        super().__init__(num_regions, num_discrete_action_levels)
+
+    def reset(self):
+        """
+        Add any negotiator specific values to global state
+        """
+        self.minimum_mitigation_rate_all_regions = np.zeros(self.num_regions)
+        self.proposed_mitigation_rate = np.zeros(self.num_regions)
+        self.defect_decisions = np.zeros(self.num_regions)
+        self.proposal_decisions = np.zeros((self.num_regions, self.num_regions))
+        self.defectors = np.zeros(self.num_regions)
+
+
+    def get_protocol_state(self):
+        protocol_state = {
+            "stage": np.array([self.stage_idx]) / self.num_stages,
+            "proposed_mitigation_rate": self.proposed_mitigation_rate
+            / self.num_discrete_action_levels,
+            "minimum_mitigation_rate_all_regions": self.minimum_mitigation_rate_all_regions
+            / self.num_discrete_action_levels,
+            "defect_decisions": self.defect_decisions,
+            "proposal_decisions": self.proposal_decisions,
+            "received_proposal_decisions": self.proposal_decisions.T,
+            "defectors":self.defectors
+        }
+        return protocol_state
+
+    def get_pub_priv_features(self):
+        public_features = ["stage", "proposed_mitigation_rate", "minimum_mitigation_rate_all_regions", "defect_decisions", "defectors"]
+        private_features = [
+            # "proposal_decisions",
+            "received_proposal_decisions",
+        ]
+        return public_features, private_features
+
+    def proposal_step(self, actions: dict):
+        """
+        Update Proposal States and Observations using proposal actions
+        Update Stage to 1 - Evaluation
+        """
+        assert self.stage_idx == 0
+
+        #each country proposes a mitigation rate 0-num_discrete_action_levels (10)
+        self.proposed_mitigation_rate = np.array(
+            [actions[region_id] for region_id in range(self.num_regions)]
+        ).squeeze()
+
+    def evaluation_step(self, actions: dict):
+        """
+        Update minimum mitigation rates
+        """
+        assert self.stage_idx == 1
+
+        self.proposal_decisions = np.array(
+            [actions[region_id] for region_id in range(self.num_regions)]
+        )
+        # Force set the evaluation for own proposal to accept
+        for region_id in range(self.num_regions):
+            self.proposal_decisions[region_id, region_id] = 1
+
+        
+        mmrar = (self.proposed_mitigation_rate * self.proposal_decisions).max(axis=1)
+        self.minimum_mitigation_rate_all_regions = mmrar
+
+
+    def defect_step(self, actions: dict):
+        """
+        Decide to reset mitigation rates to 0
+        """
+        assert self.stage_idx == 2
+
+        #extract decisions from action vector
+        self.defect_decisions = np.array(
+            [actions[region_id] for region_id in range(self.num_regions)]
+        ).squeeze()
+
+        self.minimum_mitigation_rate_all_regions = self.minimum_mitigation_rate_all_regions * (1 - self.defect_decisions)
+
+
+    def get_rice_action_mask(self):
+        """
+        Generate action masks.
+        """
+        action_mask_dict = defaultdict(dict)
+        for region_id in range(self.num_regions):
+            minimum_mitigation_rate = int(self.minimum_mitigation_rate_all_regions[region_id])
+
+            #if regions has defected
+            if self.defect_decisions[region_id] == 1:
+
+                #set mitigation to zero
+                mitigation_mask = [1]+([0]*self.num_discrete_action_levels-1)
+            
+            #otherwise mitigate according to commitment.
+            else:
+                mitigation_mask = [0] * int(minimum_mitigation_rate) + [1] * int(
+                    self.num_discrete_action_levels - minimum_mitigation_rate
+                )
+
+            # tariff masks
+            tariff_mask = []
+            for other_region_id in range(self.num_regions):
+                other_region_mitigation_rate = int(self.minimum_mitigation_rate_all_regions[other_region_id])
+
+                # if other region is self 
+                if (other_region_id == region_id):
+                    # make no change to tariff policy
+                    regional_tariff_mask = [1] * self.num_discrete_action_levels
+
+                #if region has defected, max tariff!
+                elif self.defect_decisions[other_region_id] == 1:
+                    regional_tariff_mask = [0]*(self.num_discrete_action_levels - 1)+[1]
+
+                # if other region's mitigation rate less than yours
+                elif other_region_mitigation_rate < minimum_mitigation_rate:
+                    # tariff the 1-mitigation rate
+                    region_tariff_rate = self.num_discrete_action_levels - other_region_mitigation_rate
+                    regional_tariff_mask = [0] * region_tariff_rate + [1] * other_region_mitigation_rate
+
+                # if other regions mitigation >= your own bonus: free trade
+                else:
+                    # set tarrif cap
+                    regional_tariff_mask = [1]+ [0]*(self.num_discrete_action_levels - 1)
+
+                tariff_mask.extend(regional_tariff_mask)
+
+            action_mask_dict[region_id]["tariff"] = tariff_mask
+            action_mask_dict[region_id]["mitigation"] = mitigation_mask
+
+        return action_mask_dict
 
 class BasicClubDiscreteDefect(BaseProtocol):
 
