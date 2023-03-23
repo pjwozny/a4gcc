@@ -243,20 +243,46 @@ def compute_metrics(fetch_episode_states, trainer, framework, submission_file, l
 
 
                 xs = list(range(len(ys[0])))
-                wandb.log({feature : wandb.plot.line_series(
-                       xs=xs,
-                       ys=ys.tolist(),
-                       keys=[f"region_{x}" for x in range(len(ys))],
-                       title=feature,
-                       xname="Steps")})
+                plot_name = feature.replace("_", " ").capitalize()
 
-                if feature.endswith("_all_regions"):
-                    title = f"mean_{feature.rsplit('_', 2)[0]}_over_regions"
+                if feature == "global_temperature":
+                    plot = wandb.plot.line_series(
+                        xs=xs,
+                        ys=ys.tolist(),
+                        keys=["Atmosphere", "Ocean"],
+                        title=plot_name,
+                        xname="step",
+                    )
+                    wandb.log({plot_name: plot})
+                elif feature == "global_carbon_mass":
+                    plot = wandb.plot.line_series(
+                        xs=xs,
+                        ys=ys.tolist(),
+                        keys=["Atmosphere", "Upper ocean", "Lower ocean"],
+                        title=plot_name,
+                        xname="step",
+                    )
+                    wandb.log({plot_name: plot})
+                elif feature.endswith("_all_regions"):
+                    value_name = feature[:-12].replace("_", " ")
+                    plot_name = value_name.capitalize()
+                    plot_name_mean = f"Mean {value_name}"
                     ys_mean = np.mean(ys, axis=0)
                     data = [[x, y] for (x, y) in zip(xs, ys_mean.tolist())]
-                    table = wandb.Table(data=data, columns = ["Steps", "y"])
-                    wandb.log({title : wandb.plot.line(table, "Steps", "y",
-                            title=title)})
+                    table = wandb.Table(data=data, columns=["step", value_name])
+                    plot_mean = wandb.plot.line(
+                        table, "step", value_name, title=plot_name_mean
+                    )
+                    plot = wandb.plot.line_series(
+                        xs=xs,
+                        ys=ys.tolist(),
+                        keys=[f"Region {x}" for x in range(len(ys))],
+                        title=plot_name,
+                        xname="step",
+                    )
+                    wandb.log({plot_name_mean: plot_mean})
+                    wandb.log({plot_name: plot})
+            
         if include_c_e_idx:
             if not os.path.exists(_INDEXES_FILENAME):
                 # Write min, max climate and economic index values to a file
