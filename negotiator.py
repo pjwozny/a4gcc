@@ -1826,7 +1826,7 @@ class BasicClubHardDefectWithPunishmentAndFreeTrade(BaseProtocol):
             if self.defect_decisions[region_id] == 1:
 
                 #set mitigation to zero
-                mitigation_mask = [1]+([0]*self.num_discrete_action_levels-1)
+                mitigation_mask = [1] + [0] * (self.num_discrete_action_levels - 1)
             
             #otherwise mitigate according to commitment.
             else:
@@ -1846,7 +1846,7 @@ class BasicClubHardDefectWithPunishmentAndFreeTrade(BaseProtocol):
 
                 #if region has defected, max tariff!
                 elif self.defect_decisions[other_region_id] == 1:
-                    regional_tariff_mask = [0]*(self.num_discrete_action_levels - 1)+[1]
+                    regional_tariff_mask = [0] * (self.num_discrete_action_levels - 1) + [1]
 
                 # if other region's mitigation rate less than yours
                 elif other_region_mitigation_rate < minimum_mitigation_rate:
@@ -1857,7 +1857,7 @@ class BasicClubHardDefectWithPunishmentAndFreeTrade(BaseProtocol):
                 # if other regions mitigation >= your own bonus: free trade
                 else:
                     # set tarrif cap
-                    regional_tariff_mask = [1]+ [0]*(self.num_discrete_action_levels - 1)
+                    regional_tariff_mask = [1] + [0] * (self.num_discrete_action_levels - 1)
 
                 tariff_mask.extend(regional_tariff_mask)
 
