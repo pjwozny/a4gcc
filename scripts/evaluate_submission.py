@@ -183,11 +183,11 @@ def compute_metrics(fetch_episode_states, trainer, framework, submission_file, l
         for episode_id in range(num_episodes):
             if fetch_episode_states is not None:
                 episode_states[episode_id] = fetch_episode_states(
-                    trainer, desired_outputs
+                    trainer, required_outputs
                 )
             else:
                 episode_states[episode_id] = trainer.fetch_episode_global_states(
-                    desired_outputs
+                    required_outputs
                 )
         
         with open("episode_states.pkl", "wb") as f:
@@ -205,6 +205,8 @@ def compute_metrics(fetch_episode_states, trainer, framework, submission_file, l
                                             field="minimum_mitigation_rate_all_regions")})
 
         for feature in episode_states[0].keys():
+            if feature == "activity_timestep":
+                continue
             feature_values = [None for _ in range(num_episodes)]
 
             if feature == "global_temperature":
