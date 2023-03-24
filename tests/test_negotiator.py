@@ -61,8 +61,8 @@ def test_protocol_steps(protocol_class: BaseProtocol):
     action = {i: np.zeros(action_length) for i in range(protocol.num_regions)}
 
     for _ in range(protocol.num_stages):
-        protocol.check_do_step({}, action)
+        protocol.step({}, action)
 
-    done, rice_actions = protocol.check_do_step({}, action)
-    assert done
+    rice_actions = protocol.step({}, action)
+    assert protocol.is_done()
     assert isinstance(rice_actions, dict)
