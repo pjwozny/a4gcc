@@ -163,17 +163,17 @@ class Rice:
         self.mitigation_rate_action_nvec = [self.num_discrete_action_levels]
         # Each region sets max allowed export from own region
         self.export_action_nvec = [self.num_discrete_action_levels]
-        # Each region sets import bids (max desired imports from other countries)
-        self.import_actions_nvec = [self.num_discrete_action_levels] * self.num_regions
         # Each region sets import tariffs imposed on other countries
         self.tariff_actions_nvec = [self.num_discrete_action_levels] * self.num_regions
+        # Each region sets import bids (max desired imports from other countries)
+        self.import_actions_nvec = [self.num_discrete_action_levels] * self.num_regions
 
         self.rice_actions_nvec = (
             self.savings_action_nvec
             + self.mitigation_rate_action_nvec
             + self.export_action_nvec
-            + self.import_actions_nvec
             + self.tariff_actions_nvec
+            + self.import_actions_nvec
         )
 
         self.len_rice_actions = len(self.rice_actions_nvec)
@@ -203,8 +203,8 @@ class Rice:
             ("savings", sum(self.savings_action_nvec)),
             ("mitigation", sum(self.mitigation_rate_action_nvec)),
             ("export", sum(self.export_action_nvec)),
-            ("import", sum(self.import_actions_nvec)),
             ("tariff", sum(self.tariff_actions_nvec)),
+            ("import", sum(self.import_actions_nvec)),
             ("protocol", sum(self.protocol_actions_nvec)),
         )
         self.action_names = {name for name, _ in self.action_mask_template}
