@@ -328,6 +328,7 @@ class Rice:
             "scaled_imports",
             "desired_imports",
             "tariffed_imports",
+            "overproduction_all_regions"
         ]:
             self.set_global_state(
                 key,
@@ -793,9 +794,13 @@ class Rice:
         prev_tariffs = self.get_global_state(
             "future_tariffs", timestep=self.timestep - 1
         )
-        tariffed_imports = self.get_global_state("tariffed_imports")
         scaled_imports = self.get_global_state("scaled_imports")
 
+        tariffed_imports = scaled_imports * (1 - prev_tariffs)
+        overproduction = scaled_imports - tariffed_imports
+        
+        self.set_global_state("overproduction_all_regions", np.sum(overproduction, axis=0), self.timestep)
+        
         for region_id in range(self.num_regions):
             # constants
             const = constants[region_id]
@@ -812,11 +817,7 @@ class Rice:
                 region_id=region_id,
             )
 
-            # calculate tariffed imports, tariff revenue and budget balance
-            for j in range(self.num_regions):
-                tariffed_imports[region_id, j] = scaled_imports[region_id, j] * (
-                    1 - prev_tariffs[region_id, j]
-                )
+
             tariff_revenue = np.sum(
                 scaled_imports[region_id, :] * prev_tariffs[region_id, :]
             )
@@ -832,6 +833,7 @@ class Rice:
                 dom_pref=self.dom_pref,  # in [0,1]  np.array
                 for_pref=self.for_pref,  # np.array, sums to (1 - dom_pref)
             )
+
 
             utility = get_utility(labor, consumption, const["xalpha"])
 
